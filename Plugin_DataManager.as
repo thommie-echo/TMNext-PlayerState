@@ -33,7 +33,7 @@ void Render()
 		if(WriteToLog)
 		{
 			if(TMData.dEventInfo.CheckpointChange)
-				print("checkpoint change: " + TMData.dMLData.NumCPs + "/" + TMData.dMapInfo.NumberOfCheckpoints);
+				print("checkpoint change: " + TMData.dPlayerInfo.NumberOfCheckpointsPassed + "/" + (TMData.dMapInfo.NumberOfCheckpoints + 1));
 			if(TMData.dEventInfo.PlayerStateChange)
 				print("state: " + EPlayerStateToString(TMData.PlayerState) + " at: " + TMData.dPlayerInfo.CurrentRaceTime);
 			if(TMData.dEventInfo.MapChange)

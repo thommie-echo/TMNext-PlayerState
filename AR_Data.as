@@ -162,7 +162,7 @@ class sTMData
 			return EPlayerState::EPlayerState_Finished;
 		if(dPlayerInfo.StartTime > dGameInfo.GameTime) // StartTime is actually in the future when in countdown
 			return EPlayerState::EPlayerState_Countdown;
-		if(ScriptAPI.Post == EPost::CarDriver && previous.PlayerState == EPlayerState::EPlayerState_Countdown) // Only go to driving if you were counting down previously
+		if(ScriptAPI.Post == EPost::CarDriver && previous !is null && previous.PlayerState == EPlayerState::EPlayerState_Countdown) // Only go to driving if you were counting down previously
 			return EPlayerState::EPlayerState_Driving;
 			
 		if(previous !is null) // If in doubt, copy the prior version
@@ -209,7 +209,9 @@ class sTMData
 		{
 			dPlayerInfo.NumberOfCheckpointsPassed = previous.dPlayerInfo.NumberOfCheckpointsPassed;
 			dPlayerInfo.RaceWaypointTimes = previous.dPlayerInfo.RaceWaypointTimes;
+			dPlayerInfo.CurrentLapNumber = previous.dPlayerInfo.CurrentLapNumber;
 			dMLData.NumCPs = previous.dMLData.NumCPs;
+			
 		}
 		
 		// If we're counting down but were driving previously, meaning we either finished or ended our run prematurely
@@ -219,11 +221,33 @@ class sTMData
 			PlayerState = EPlayerState::EPlayerState_EndRace; // Manually adjust to end race to get the event later in this function
 		}
 		
+		uint LapCPs = dMLData.NumCPs - dPlayerInfo.CurrentLapNumber * dMapInfo.NumberOfCheckpoints;
+		
 		// Finish also counts as NumCPs but have been excluded from NumberOfCheckpoints
-		if(dMLData.NumCPs  > dMapInfo.NumberOfCheckpoints)
+		if(LapCPs  > dMapInfo.NumberOfCheckpoints)
 		{
-			PlayerState = EPlayerState::EPlayerState_Finished;
-			dPlayerInfo.EndTime = previous.dPlayerInfo.EndTime;
+			if(dMapInfo.IsFinish(dPlayerInfo.LatestCheckpointLandmarkIndex))
+			{
+				if(dMapInfo.IsMultiLap(dPlayerInfo.LatestCheckpointLandmarkIndex))
+				{
+					if(dPlayerInfo.CurrentLapNumber < dMapInfo.TMObjective_NbLaps - 1)
+					{
+						dPlayerInfo.CurrentLapNumber++;
+						print("Start of lap: " + (dPlayerInfo.CurrentLapNumber + 1));
+						dPlayerInfo.NumberOfCheckpointsPassed = 0;
+					}
+					else
+					{
+						PlayerState = EPlayerState::EPlayerState_Finished;
+						dPlayerInfo.EndTime = previous.dPlayerInfo.EndTime;
+					}
+				}
+				else
+				{
+					PlayerState = EPlayerState::EPlayerState_Finished;
+					dPlayerInfo.EndTime = previous.dPlayerInfo.EndTime;
+				}
+			}
 		}
 		
 		if(PlayerState != previous.PlayerState)
@@ -350,7 +374,7 @@ class sTMData
 		IsMultiplayer = app.PlaygroundScript is null; // 
 		dGameInfo.Update(CurrentPlayground, PlaygroundClientScriptAPI, previous);
 		dServerInfo.Update(CurrentPlayground, ServerInfo);
-		dMapInfo.Update(RootMap, CurrentPlayground);
+		dMapInfo.Update(RootMap, CurrentPlayground, previous);
 		
 		// We need these to find the local player
 		if(CurrentPlayground.GameTerminals.get_Length() < 1 || CurrentPlayground.GameTerminals[0].ControlledPlayer is null)
@@ -556,12 +580,16 @@ class sMapInfo
 	int NumberOfCheckpoints; // CurrentPlayground.Arena.MapLandmarks.Tag = "Checkpoint", "Goal" = Finish, "Spawn"=  Start
 	int StartCPNumber;
 	
+	bool bIsMultiLap;
+	
+	MwFastBuffer<CGameScriptMapLandmark@> MapLandmarks;
+	
 	// BlockInfo[]@ PlayerSpawns;
 	// BlockInfo[]@ MapWaypoints;
 	
 	// BlockInfo[]@ Blocks;
 	
-	void Update(CGameCtnChallenge@ RootMap, CSmArenaClient@ CurrentPlayground)
+	void Update(CGameCtnChallenge@ RootMap, CSmArenaClient@ CurrentPlayground, sTMData@ previous)
 	{
 		EdChallengeId = RootMap.EdChallengeId;
 		AuthorLogin = RootMap.AuthorLogin;
@@ -576,23 +604,74 @@ class sMapInfo
 		TMObjective_GoldTime = RootMap.TMObjective_GoldTime;
 		TMObjective_SilverTime = RootMap.TMObjective_SilverTime;
 		TMObjective_BronzeTime = RootMap.TMObjective_BronzeTime;
-		
+
 		if(CurrentPlayground is null || CurrentPlayground.Arena is null || CurrentPlayground.Arena.MapLandmarks.get_Length() < 1)
 			return;
 		
+		if(previous is null)
+			UpdateLandmarks(CurrentPlayground);
+		else if(previous.dMapInfo.EdChallengeId == EdChallengeId && previous.dMapInfo.MapLandmarks.get_Length() > 0)
+		{
+			MapLandmarks = previous.dMapInfo.MapLandmarks;
+			NumberOfCheckpoints = previous.dMapInfo.NumberOfCheckpoints;
+			StartCPNumber = previous.dMapInfo.StartCPNumber;
+		}
+		else
+			UpdateLandmarks(CurrentPlayground);				
+	}
+	
+	void UpdateLandmarks(CSmArenaClient@ CurrentPlayground)
+	{
 		uint numLandmarks = CurrentPlayground.Arena.MapLandmarks.get_Length();
+		MapLandmarks = CurrentPlayground.Arena.MapLandmarks;
+		
+		print("" + numLandmarks);
 		
 		for(uint i = 0; i < numLandmarks; i++)
 		{
 			if(CurrentPlayground.Arena.MapLandmarks[i] !is null)
 			{
+				if(CurrentPlayground.Arena.MapLandmarks[i].Waypoint !is null)
+				{
+					print("index: " + i + ", Tag: " + CurrentPlayground.Arena.MapLandmarks[i].Tag + ", Multi: " + CurrentPlayground.Arena.MapLandmarks[i].Waypoint.IsMultiLap + ", Finish: " + CurrentPlayground.Arena.MapLandmarks[i].Waypoint.IsFinish);
+					
+					if(CurrentPlayground.Arena.MapLandmarks[i].Waypoint.IsMultiLap)
+						bIsMultiLap = true;
+				}
+				else
+				{
+					print("index: " + i + ", Tag: " + CurrentPlayground.Arena.MapLandmarks[i].Tag);
+				}
+				 
+				
 				if(CurrentPlayground.Arena.MapLandmarks[i].Tag == "Checkpoint")
 					NumberOfCheckpoints++;
 				else if(CurrentPlayground.Arena.MapLandmarks[i].Tag == "Spawn")
 					StartCPNumber = i;
 			}
 		}
-		
+	}
+	
+	bool IsMultiLap(int Index)
+	{
+		if(MapLandmarks.get_Length() < 1)
+			return false;
+			
+		if(MapLandmarks[Index].Waypoint is null) // Null if start
+			return false;
+			
+		return MapLandmarks[Index].Waypoint.IsMultiLap;
+	}
+	
+	bool IsFinish(int Index)
+	{
+		if(MapLandmarks.get_Length() < 1)
+			return false;
+			
+		if(MapLandmarks[Index].Waypoint is null) // Null if start
+			return false;
+			
+		return MapLandmarks[Index].Waypoint.IsFinish;
 	}
 	
 	Json::Value Serialize()
@@ -625,11 +704,12 @@ class sPlayerInfo
 	uint[] RaceWaypointTimes; // Also available in string format from sMLData
 	uint[] LapWaypointTimes; // TODO: find a way to implement this
 	uint NumberOfCheckpointsPassed; // This is actually the same as the length of RaceWaypointTimes but whatever...
+	uint CurrentLapNumber; // CSmPlayer.ScriptAPI TODO: check if this works
 	int CurrentRaceTime; // CSmPlayer.ScriptAPI <-- doesn't work online so we calculate based on GameTime - StartTime
 
 	// Values determined by TM (online)
 	int StartTime; // CSmPlayer.ScriptAPI; in GameTime
-	uint CurrentLapNumber; // CSmPlayer.ScriptAPI TODO: check if this works
+	
 	int LapStartTime; // CSmPlayer.ScriptAPI TODO: check if this works
 	vec3 Position; // CSmPlayer.ScriptAPI
 	float AimYaw; // CSmPlayer.ScriptAPI
@@ -669,7 +749,7 @@ class sPlayerInfo
 	{		
 		StartTime = ScriptAPI.StartTime;
 		CurrentRaceTime = GameTime - ScriptAPI.StartTime;
-		CurrentLapNumber = ScriptAPI.CurrentLapNumber;
+		//CurrentLapNumber = ScriptAPI.CurrentLapNumber;
 		LapStartTime = ScriptAPI.LapStartTime;
 		Position = ScriptAPI.Position;
 		AimYaw = ScriptAPI.AimYaw;
@@ -680,7 +760,7 @@ class sPlayerInfo
 		Upwardness = ScriptAPI.Upwardness;
 		Distance = ScriptAPI.Distance;
 		//DisplaySpeed = ScriptAPI.DisplaySpeed;
-		DisplaySpeed = Velocity.Length() * 3.6f;
+		DisplaySpeed = uint(Velocity.Length() * 3.6f);
 		InputSteer = ScriptAPI.InputSteer;
 		InputGasPedal = ScriptAPI.InputGasPedal;
 		InputIsBraking = ScriptAPI.InputIsBraking;
