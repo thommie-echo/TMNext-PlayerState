@@ -46,6 +46,10 @@ void Render()
 				print("GameModeChange: " + TMData.dServerInfo.CurGameModeStr);
 			if(TMData.dEventInfo.HandicapChange)
 				print("HandicapChange");
+			if(TMData.dEventInfo.LapChange)
+				print("Lap change: " + (TMData.dPlayerInfo.CurrentLapNumber + 1) + "/" + TMData.dMapInfo.TMObjective_NbLaps + " at: " + TMData.dPlayerInfo.LapStartTime);
+			if(TMData.dEventInfo.FinishRun)
+				print("Finished at: " + TMData.dPlayerInfo.EndTime);
 		}
 	}
 	
