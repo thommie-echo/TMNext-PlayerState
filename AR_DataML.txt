@@ -34,7 +34,7 @@ while(True)
 			}
 		}
 		
-		declare Text PlayerText = Player.Login ^ ",," ^ TL::ToText(Player.StartTime) ^ ",," ^ TL::ToText(Player.CurrentRaceTime) ^ ",," ^ Player.RaceWaypointTimes.count ^ ",,";
+		declare Text PlayerText = Player.Login ^ ",@," ^ TL::ToText(Player.StartTime) ^ ",@," ^ TL::ToText(Player.CurrentRaceTime) ^ ",@," ^ Player.RaceWaypointTimes.count ^ ",@,";
 		declare Text CPText = "";
 		
 		foreach (Time in Player.RaceWaypointTimes) 
@@ -43,7 +43,7 @@ while(True)
 		}
 		
 		PlayerText = PlayerText ^ CPText;
-		FullText = FullText ^ PlayerText ^ ",,,";
+		FullText = FullText ^ PlayerText ^ ",$,$,";
 	}
 	L1.SetText(TL::ToText(NumCPs) ^ ",," ^FullTime);
 	L2.SetText(TL::ToText(NumCPs));

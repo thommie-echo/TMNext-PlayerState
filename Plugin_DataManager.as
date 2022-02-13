@@ -10,7 +10,6 @@ bool WriteToFile = true;
 [Setting name="Write small log"]
 bool WriteToLog = false;
 
-
 sTMData@ TMData;
 
 void Main() {
@@ -29,6 +28,7 @@ void Render()
 		TMData.Compare(previous);
 		if(WriteToFile)
 			TMData.WriteToFile();
+
 		
 		if(WriteToLog)
 		{

@@ -27,7 +27,7 @@ wstring GetDataML()
 }
 
 // Returns the layer in the player's UI or creates it if there is none (i.e. after leaving the menu)
-CGameUILayer@ GetLayer(wstring manialink, string id, CGameManiaAppPlayground@ UIMgr, CGamePlaygroundUIConfig@ clientUI)
+CGameUILayer@ GetLayer(wstring manialink, const string &in id, CGameManiaAppPlayground@ UIMgr, CGamePlaygroundUIConfig@ clientUI)
 {
 	for(uint i = 0; i < clientUI.UILayers.Length; ++i) //This is used to check if we haven't already a layer with the same id, to avoid doubles
 	{
@@ -163,7 +163,7 @@ class sTMData
 			return EPlayerState::EPlayerState_Finished;
 		if(dPlayerInfo.StartTime > dGameInfo.GameTime) // StartTime is actually in the future when in countdown
 			return EPlayerState::EPlayerState_Countdown;
-		if(ScriptAPI.Post == EPost::CarDriver && previous !is null && previous.PlayerState == EPlayerState::EPlayerState_Countdown) // Only go to driving if you were counting down previously
+		if(ScriptAPI.Post == CSmScriptPlayer::EPost::CarDriver && previous !is null && previous.PlayerState == EPlayerState::EPlayerState_Countdown) // Only go to driving if you were counting down previously
 			return EPlayerState::EPlayerState_Driving;
 			
 		if(previous !is null) // If in doubt, copy the prior version
@@ -209,7 +209,9 @@ class sTMData
 		{
 			dEventInfo.CheckpointChange = true; // Set the event
 			dPlayerInfo.NumberOfCheckpointsPassed = previous.dPlayerInfo.NumberOfCheckpointsPassed + 1; // Increment the number of cps passed
-			AddCheckpointTime(false); // Add checkpoint time, but not a finish time
+			dPlayerInfo.RaceWaypointTimes = previous.dPlayerInfo.RaceWaypointTimes;
+			uint CPTime = AddCheckpointTime(false); // Add checkpoint time, but not a finish time
+			dPlayerInfo.LatestCPTime =CPTime;
 		}
 		else if(dPlayerInfo.LatestCheckpointLandmarkIndex != dMapInfo.StartCPNumber) // Else copy from previous state
 		{
@@ -308,7 +310,7 @@ class sTMData
 		}
 	}
 	
-	void AddCheckpointTime(bool bFinishTime = false)
+	uint AddCheckpointTime(bool bFinishTime = false)
 	{
 		int RaceTime =  dPlayerInfo.CurrentRaceTime; // Use the CurrentRaceTime by default
 		
@@ -319,6 +321,8 @@ class sTMData
 		
 		if(bFinishTime && dPlayerInfo.EndTime == 0) // Set the endtime to the CurrentRaceTime just in case
 			dPlayerInfo.EndTime = RaceTime;
+			
+		return RaceTime;
 	}
 	
 	// This is only called when there is no reference data from the previous sTMData state
@@ -464,7 +468,7 @@ class sTMData
 		return Json::Write(obj);	
 	}
 	
-	void WriteToFile(string FileName = "TMData")
+	void WriteToFile(const string &in FileName = "TMData")
 	{
 		string File_To_Load = IO::FromDataFolder(scriptFolder + FileName + ".json");
 		IO::File file(File_To_Load);
@@ -728,6 +732,7 @@ class sPlayerInfo
 	uint CurrentLapNumber; // CSmPlayer.ScriptAPI TODO: check if this works
 	int CurrentRaceTime; // CSmPlayer.ScriptAPI <-- doesn't work online so we calculate based on GameTime - StartTime
 	int LapStartTime; // CSmPlayer.ScriptAPI TODO: check if this works
+	uint LatestCPTime;
 
 	// Values determined by TM (online)
 	int StartTime; // CSmPlayer.ScriptAPI; in GameTime
