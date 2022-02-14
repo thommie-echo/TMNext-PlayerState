@@ -40,9 +40,10 @@ Resources::Font@ m_font;
 CGameManialinkLabel@ lbl_Players;
 CGameManialinkLabel@ lbl_KOs;
 
-vec4 colour_Red = vec4(0, 1, 0, 1);
-vec4 colour_Green = vec4(1, 0, 0, 1);
-vec4 colour_White = vec4(1, 1, 1, 1);
+const vec4 colour_Red = vec4(0, 1, 0, 1);
+const vec4 colour_Green = vec4(1, 0, 0, 1);
+const vec4 colour_Blue = vec4(0, 0, 1, 1);
+const vec4 colour_White = vec4(1, 1, 1, 1);
 
 
 sTMData@ TMData;
@@ -176,6 +177,7 @@ class CustomPlayerData
 	uint CurrentRaceTime;
 	uint StartTime;
 	uint LatestCPTime;
+	bool bRestarted;
 	
 	CustomPlayerData()
 	{
@@ -215,6 +217,11 @@ class CustomPlayerData
 			Log(4, "Player " + UpdatedPlayer.Login + " has new CP, index: " + UpdatedPlayer.NumCPs + " with time: " + LatestCPTime);
 			Result = true;
 		}
+		
+		if(UpdatedPlayer.StartTime != StartTime)
+			bRestarted = true;
+		else
+			bRestarted = false;
 		
 		NumCPs = UpdatedPlayer.NumCPs;
 		CPTimes = UpdatedPlayer.CPTimes;
@@ -292,24 +299,33 @@ void RenderNextCPTime()
 		}
 	}
 	
-	if(currentPlayer.CPTimes.Length == 0)
+	if(currentPlayer.bRestarted)
+		EndOfRoundReset();
+		
+	bool bLiveTime;
+	
+	if(currentPlayer.CPTimes.Length == 0) // player has not passed a CP
 	{
-		if(CPInfos.Length > 0 && CPInfos[0].Times.Length >= firstSafePosition)
+		if(CPInfos.Length > 0 && CPInfos[0].Times.Length >= firstSafePosition) // check if enough people have already passed the first CP
 		{
 			timeDiff = currentPlayer.CurrentRaceTime - CPInfos[0].Times[firstSafePosition -1];
+			bLiveTime = true;
 		}
+		else
+			timeDiff = 0;
 	}
-	else
+	else // player has passed at least one cp
 	{
 		int playerCPNum = currentPlayer.CPTimes.Length -1;
 		if(CPInfos.Length > playerCPNum && CPInfos[playerCPNum + 1].Times.Length >= firstSafePosition) // next cp time
 		{
 			timeDiff = currentPlayer.CurrentRaceTime - CPInfos[playerCPNum + 1].Times[firstSafePosition -1];
+			bLiveTime = true;
 		}
-		else if(CPInfos[playerCPNum].Times.Length >= firstSafePosition)
+		else if(CPInfos[playerCPNum].Times.Length >= firstSafePosition) // At least all the safe people have passed the same CP as the player
 		{
 			int playerIndex = CPInfos[playerCPNum].Times.Find(currentPlayer.LatestCPTime);
-			if(playerIndex == -1)
+			if(playerIndex == -1) // Somehow the player has passed this CP but we can't find their time in the list
 			{
 				timeDiff = 0;
 			}
@@ -317,30 +333,28 @@ void RenderNextCPTime()
 			{
 				timeDiff = currentPlayer.LatestCPTime - CPInfos[playerCPNum].Times[firstSafePosition -1];
 			}
-			else
+			else // player in safe position
 			{
-				if(CPInfos[playerCPNum].Times.Length > 0 && CPInfos[playerCPNum].Times.Length > firstSafePosition)
+				if(CPInfos[playerCPNum].Times.Length > 0 && CPInfos[playerCPNum].Times.Length > firstSafePosition) // Check if the first KO person has already passed the CP
 					timeDiff = currentPlayer.LatestCPTime - CPInfos[playerCPNum].Times[firstSafePosition];
-				else
-					timeDiff = 0;
+				else // We've passed the CP, so has the last safe person, but not the first KO position
+				{
+					currentPlayer.LatestCPTime - currentPlayer.CurrentRaceTime;
+					bLiveTime = true;
+				}
 			}
 		}
 		else
 		{
 			timeDiff = currentPlayer.LatestCPTime - currentPlayer.CurrentRaceTime;
+			bLiveTime = true;
 		}
 	}
 	
-	if(currentPlayer.CPTimes.Length != currentPlayerCP)
-	{
-		//CalculateTimeDiff();
-	}
-	
-	if(timeDiff == -1 && !bAlwaysRender)
-		return;
-	
 	nvg::FontFace(m_font);
-	if(timeDiff < 0)
+	if(bLiveTime)
+		nvg::FillColor(colour_White);
+	else if(timeDiff < 0)
 		nvg::FillColor(colour_Red);
 	else if(timeDiff > 0)
 		nvg::FillColor(colour_Green);
@@ -387,7 +401,13 @@ string GetFormattedTime(int input)
 	}
 	else
 	{
-		Result = "0:00." + absTime;
+		string prefix = "0:00.";
+		if(absTime < 10)
+			prefix = prefix + "00";
+		else if (absTime < 100)
+			prefix = prefix + "0";
+			
+		Result = prefix + absTime;
 	}
 	
 	if(input < 0)
@@ -397,90 +417,6 @@ string GetFormattedTime(int input)
 }
 
 
-void CalculateTimeDiff()
-{
-	if(currentPlayer is null || (currentPlayer.Login != currentPlayerID && currentPlayerID != ""))
-	{
-		@currentPlayer = GetPlayerData(currentPlayerID);
-		
-		if(currentPlayer is null)
-		{
-			Log(1, "Could not find player with ID: " + currentPlayerID);
-			return;
-		}
-	}
-	
-	if(currentPlayer !is null)
-	{
-		currentPlayerCP = currentPlayer.CPTimes.Length;
-		currentPlayerCPTime = currentPlayer.LatestCPTime;
-	}
-	
-	if(CPInfos.Length >= currentPlayerCP && CPInfos.Length > 0)
-	{
-		int tempCP = Math::Max(currentPlayerCP, 0);
-		if(CPInfos[tempCP].Times.Length >= firstSafePosition) // We're behind so start showing some red deltas
-		{
-			Log(2, "Calculating live diff to next cp, in KO zone");
-			currentPlayerCPTime = currentPlayer.CurrentRaceTime;
-			targetCPTime = CPInfos[tempCP].Times[firstSafePosition];
-			timeDiff = currentPlayerCPTime - targetCPTime;
-		}
-		else if(currentPlayerCP > 0 && CPInfos[currentPlayerCP - 1].Times.Length > firstSafePosition && currentPlayerCPTime > 0) // We should be good so find the first KO CP time
-		{
-			uint playerIndex = CPInfos[currentPlayerCP - 1].Times.Find(currentPlayerCPTime);
-			if(playerIndex > firstSafePosition)
-			{
-				Log(2, "Calculating diff to next cp, in KO zone");
-				targetCPTime = CPInfos[currentPlayerCP - 1].Times[firstSafePosition];
-				timeDiff = currentPlayerCPTime - targetCPTime;
-			}
-			else if(CPInfos[currentPlayerCP - 1].Times.Length > firstSafePosition + 1)
-			{
-				Log(2, "Calculating diff to next cp, in safe zone");
-				targetCPTime = CPInfos[currentPlayerCP - 1].Times[firstSafePosition + 1];
-				timeDiff = currentPlayerCPTime - targetCPTime;
-			}
-			else
-			{
-				Log(2, "Calculating live diff to next cp, in safe zone");
-				targetCPTime = currentPlayer.CurrentRaceTime;
-				timeDiff = targetCPTime - currentPlayerCPTime;
-			}
-			
-		}
-		else
-		{
-			Log(2,"Not enough CPs available yet");
-			targetCPTime = -1;
-			timeDiff = -1;
-		}
-	}
-	
-
-	// if(currentPlayerCPTime < 1)
-		// return;
-		
-		
-	// Log(2, "Calculating diff for new CPNum: " + currentPlayerCP + " with player time: " + currentPlayerCPTime);
-		
-	// if(CPInfos.Length >= currentPlayerCP && currentPlayerCP > 0 && CPInfos[currentPlayerCP - 1].Times.Length >= firstSafePosition)
-	// {
-		// targetCPTime = CPInfos[currentPlayerCP - 1].Times[firstSafePosition - 1];
-		// timeDiff = currentPlayerCPTime - targetCPTime;
-		// Log(2, "Calculated diff is: " + timeDiff + " with target time: " + targetCPTime);
-	// }
-	// else
-	// {
-		// if(currentPlayerCP > 0 && CPInfos.Length >= currentPlayerCP)
-			// Log(2, "Not enough CPs available yet for CPNum: " + currentPlayerCP + " target: " + firstSafePosition + " with length: " + CPInfos[currentPlayerCP - 1].Times.Length);
-		// else
-			// Log(2, "Not enough CPs available yet for CPNum: " + currentPlayerCP + " target: " + firstSafePosition);
-			
-		// targetCPTime = -1;
-		// timeDiff = -1;
-	// }
-}
 
 void InsertCPTime(uint CPTime, int CPNum)
 {
@@ -488,19 +424,11 @@ void InsertCPTime(uint CPTime, int CPNum)
 		CreateCPInfos();
 		
 	CPInfos[CPNum - 1].Times.InsertLast(CPTime);
-	CPInfos[CPNum - 1].Times.SortAsc();
+	if(CPInfos[CPNum - 1].Times.Length > firstSafePosition - 1)
+		CPInfos[CPNum - 1].Times.SortAsc();
 	
 	Log(3, "Adding new CP time, CPNum: " + CPNum + " with time: " + CPTime + " total length for this CP at: " + CPInfos[CPNum - 1].Times.Length);
 	
-	//if(currentPlayerCP > 0)
-		//CalculateTimeDiff();
-	
-	//if(currentPlayerCP > 0 && int(CPInfos[CPNum - 1].Times.Length) >=firstSafePosition && CPNum == currentPlayerCP && firstSafePosition > -1)
-	//{
-	//	targetCPTime = CPInfos[CPNum - 1].Times[firstSafePosition - 1];
-	//	timeDiff = currentPlayerCPTime - targetCPTime;
-	//	Log(4, "New time difference found for player, CPNum: " + CPNum + " total length for this CP at: " + CPInfos[CPNum - 1].Times.Length + " difference: " + timeDiff);
-	//}
 }
 
 void CreateCPInfos()
@@ -572,11 +500,11 @@ void Render()
 		if(!TMData.dServerInfo.CurGameModeStr.Contains("Knockout"))
 			return;
 			
-		if(TMData.dEventInfo.PlayerStateChange)
-			EndOfRoundReset();
+		//if(TMData.dEventInfo.PlayerStateChange)
+			//EndOfRoundReset();
 			
-		if(TMData.dEventInfo.MapChange)
-			FullReset();
+		//if(TMData.dEventInfo.MapChange)
+			//FullReset();
 			
 		if(TMData.dEventInfo.CheckpointChange)
 		{
