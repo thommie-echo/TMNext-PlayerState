@@ -4,6 +4,9 @@
 
 #include "AR_Data.as"
 
+[Setting name="Enabled"]
+bool bEnabled = true;
+
 [Setting name="XPos"]
 int XPos = 50;
 
@@ -11,28 +14,27 @@ int XPos = 50;
 int YPos = 350;
 
 [Setting name="Fontsize"]
-int fontSize = 18;
+int fontSize = 25;
 
-[Setting name="Always render"]
-bool bAlwaysRender = false;
+[Setting name="Negative difference colour" color]
+vec4 colour_Red = vec4(0, 1, 0, 1);
+
+[Setting name="Positive difference colour" color]
+vec4 colour_Green = vec4(1, 0, 0, 1);
+
+[Setting name="Live difference colour" color]
+vec4 colour_White = vec4(1, 1, 1, 1);
+
 
 [Setting name="Log detail level"]
 int logDetailLevel = 0;
 
-[Setting name="Enabled"]
-bool bEnabled = true;
-
 
 string currentPlayerID = "";
 CustomPlayerData@ currentPlayer;
-int currentPlayerCP = -1;
-int currentPlayerCPTime = -1;
 
 int firstSafePosition = -1;
 int targetCPTime = -1;
-int timeDiff = -1;
-
-
 
 string NumberFont = "DroidSans.ttf";
 Resources::Font@ m_font;
@@ -40,10 +42,7 @@ Resources::Font@ m_font;
 CGameManialinkLabel@ lbl_Players;
 CGameManialinkLabel@ lbl_KOs;
 
-const vec4 colour_Red = vec4(0, 1, 0, 1);
-const vec4 colour_Green = vec4(1, 0, 0, 1);
-const vec4 colour_Blue = vec4(0, 0, 1, 1);
-const vec4 colour_White = vec4(1, 1, 1, 1);
+int lastDiff = 0;
 
 
 sTMData@ TMData;
@@ -68,7 +67,6 @@ void Log(int level, const string &in message)
 
 void Main() 
 {
-	Log(1, "Started");
 	@m_font = Resources::GetFont(NumberFont);
 	
 	@TMData = sTMData();
@@ -79,7 +77,6 @@ void Main()
 
 void GetUILayer()
 {
-	Log(2, "Getting UI Layer");
 	// These are all variables we'll need for updating
 	CGameCtnApp@ app;
 	CGameCtnNetwork@ Network;
@@ -122,13 +119,10 @@ void GetUILayer()
 	
 	if(lbl_Players is null || lbl_KOs is null)
 		print("ERROR: Could not find all lables");
-		
-	Log(2, "UI Layer found");
 }
 
 void UpdateLabels()
 {
-	Log(5, "Updating labels");
 	if(lbl_Players is null || lbl_KOs is null)
 		GetUILayer();
 	
@@ -139,8 +133,6 @@ void UpdateLabels()
 	int numKOs = GetNumKOs(numPlayers, lbl_KOs.Value);
 	
 	firstSafePosition = numPlayers - numKOs;
-	
-	Log(5, "First safe position: " + firstSafePosition);
 }
 
 int GetNumKOs(int numPlayers, const string &in KOString)
@@ -224,7 +216,16 @@ class CustomPlayerData
 			bRestarted = false;
 		
 		NumCPs = UpdatedPlayer.NumCPs;
-		CPTimes = UpdatedPlayer.CPTimes;
+		//CPTimes = UpdatedPlayer.CPTimes;
+		for(int i = 0; i < UpdatedPlayer.CPTimes.Length; i++)
+		{
+			CPTimes.InsertLast(UpdatedPlayer.CPTimes[i]);
+		}
+		if(CPTimes.Length > 0)
+			LatestCPTime = CPTimes[NumCPs -1];
+		else
+			LatestCPTime = 0;
+		
 		CurrentRaceTime = UpdatedPlayer.CurrentRaceTime;
 		StartTime = UpdatedPlayer.StartTime;
 		
@@ -266,7 +267,6 @@ void GetPlayersFromString(const string &in input)
 			
 			if(!bFoundPlayer)
 			{
-				Log(3, "Found new player: " + lPlayers[i].Login);
 				OnlinePlayers.InsertLast(lPlayers[i]);
 			}
 		}
@@ -275,7 +275,6 @@ void GetPlayersFromString(const string &in input)
 	{
 		for(i = 0; i < lPlayers.get_Length(); i++)
 		{
-			Log(3, "Found new player (2): " + lPlayers[i].Login);
 			OnlinePlayers.InsertLast(lPlayers[i]);
 		}
 	}
@@ -303,6 +302,7 @@ void RenderNextCPTime()
 		EndOfRoundReset();
 		
 	bool bLiveTime;
+	int timeDiff = 0;
 	
 	if(currentPlayer.CPTimes.Length == 0) // player has not passed a CP
 	{
@@ -310,9 +310,13 @@ void RenderNextCPTime()
 		{
 			timeDiff = currentPlayer.CurrentRaceTime - CPInfos[0].Times[firstSafePosition -1];
 			bLiveTime = true;
+			//print("test8");
 		}
 		else
-			timeDiff = 0;
+		{
+			timeDiff = lastDiff;
+			//print("test7");
+		}
 	}
 	else // player has passed at least one cp
 	{
@@ -321,25 +325,33 @@ void RenderNextCPTime()
 		{
 			timeDiff = currentPlayer.CurrentRaceTime - CPInfos[playerCPNum + 1].Times[firstSafePosition -1];
 			bLiveTime = true;
+			//print("test5");
 		}
 		else if(CPInfos[playerCPNum].Times.Length >= firstSafePosition) // At least all the safe people have passed the same CP as the player
 		{
 			int playerIndex = CPInfos[playerCPNum].Times.Find(currentPlayer.LatestCPTime);
 			if(playerIndex == -1) // Somehow the player has passed this CP but we can't find their time in the list
 			{
+				//print("test4");
 				timeDiff = 0;
 			}
 			else if(playerIndex >= firstSafePosition) // player in ko
 			{
+				//print("test3");
 				timeDiff = currentPlayer.LatestCPTime - CPInfos[playerCPNum].Times[firstSafePosition -1];
 			}
 			else // player in safe position
 			{
 				if(CPInfos[playerCPNum].Times.Length > 0 && CPInfos[playerCPNum].Times.Length > firstSafePosition) // Check if the first KO person has already passed the CP
+				{
+					
 					timeDiff = currentPlayer.LatestCPTime - CPInfos[playerCPNum].Times[firstSafePosition];
+					//print("test  " + timeDiff);
+				}
 				else // We've passed the CP, so has the last safe person, but not the first KO position
 				{
-					currentPlayer.LatestCPTime - currentPlayer.CurrentRaceTime;
+					//print("tes2");
+					timeDiff = currentPlayer.LatestCPTime - currentPlayer.CurrentRaceTime;
 					bLiveTime = true;
 				}
 			}
@@ -348,8 +360,13 @@ void RenderNextCPTime()
 		{
 			timeDiff = currentPlayer.LatestCPTime - currentPlayer.CurrentRaceTime;
 			bLiveTime = true;
+			//print("test6");
 		}
 	}
+	
+	if(timeDiff > 0)
+		lastDiff = timeDiff;
+	//print("" + timeDiff);
 	
 	nvg::FontFace(m_font);
 	if(bLiveTime)
@@ -365,6 +382,15 @@ void RenderNextCPTime()
 	nvg::BeginPath();
 	nvg::FontSize(fontSize);
 	nvg::TextBox(0, YPos, XPos, GetFormattedTime(timeDiff));
+}
+
+CSmPlayer@ GetViewingPlayer()
+{
+	auto playground = GetApp().CurrentPlayground;
+	if (playground is null || playground.GameTerminals.Length != 1) {
+		return null;
+	}
+	return cast<CSmPlayer>(playground.GameTerminals[0].GUIPlayer);
 }
 
 string GetFormattedTime(int input)
@@ -425,30 +451,11 @@ void InsertCPTime(uint CPTime, int CPNum)
 		
 	CPInfos[CPNum - 1].Times.InsertLast(CPTime);
 	if(CPInfos[CPNum - 1].Times.Length > firstSafePosition - 1)
-		CPInfos[CPNum - 1].Times.SortAsc();
-	
-	Log(3, "Adding new CP time, CPNum: " + CPNum + " with time: " + CPTime + " total length for this CP at: " + CPInfos[CPNum - 1].Times.Length);
-	
+		CPInfos[CPNum - 1].Times.SortAsc();	
 }
 
 void CreateCPInfos()
 {
-	Log(1, "Creating CP Infos");
-	
-	print("-------- resetting CP infos");
-	if(CPInfos.Length > 0)
-	{
-		for(int i = 0; i < CPInfos.Length; i++)
-		{
-			print("index: " + i + ", count: " + CPInfos[i].Times.Length);
-			
-			if(currentPlayer !is null && currentPlayer.CPTimes.Length > i)
-			{
-				print("player index: " + CPInfos[i].Times.Find(currentPlayer.CPTimes[i]));
-			}
-		}
-	}
-	
 	CPInfos.RemoveRange(0,CPInfos.Length);
 	if(TMData !is null)
 	{
@@ -457,28 +464,14 @@ void CreateCPInfos()
 			CPInfos.InsertLast(CPInfo());
 		}
 	}
-	
-	//OnlinePlayers.RemoveRange(0,OnlinePlayers.Length);
 }
 
 void EndOfRoundReset()
 {
-	Log(1, "End of round reset");
-	currentPlayerCP = -1;
-	currentPlayerCPTime = -1;
-	targetCPTime = -1;
-	timeDiff = -1;
+	print("resetting");
+	firstSafePosition = -1;
 
 	CreateCPInfos();
-}
-
-void FullReset()
-{
-	Log(1, "Full Reset");
-	firstSafePosition = -1;
-	EndOfRoundReset();
-	
-	OnlinePlayers.RemoveRange(0, OnlinePlayers.get_Length());
 }
 
 
@@ -495,24 +488,24 @@ void Render()
 		if(!bEnabled)
 			return;
 		
-		currentPlayerID = TMData.dPlayerInfo.Login;
-		
 		if(!TMData.dServerInfo.CurGameModeStr.Contains("Knockout"))
-			return;
-			
-		//if(TMData.dEventInfo.PlayerStateChange)
-			//EndOfRoundReset();
-			
-		//if(TMData.dEventInfo.MapChange)
-			//FullReset();
-			
-		if(TMData.dEventInfo.CheckpointChange)
 		{
-			//currentPlayerCP = TMData.dPlayerInfo.NumberOfCheckpointsPassed;
-			//currentPlayerCPTime = TMData.dPlayerInfo.LatestCPTime;
-			//timeDiff = -1;
-			//Log(2, "Player reached new CPNum: " + currentPlayerCP + " with time: " + currentPlayerCPTime);
+			if(OnlinePlayers.Length > 0)
+				OnlinePlayers.RemoveRange(0, OnlinePlayers.get_Length());
+			return;		
 		}
+		
+		CSmPlayer@ viewPlayer;
+		@viewPlayer	= GetViewingPlayer();
+		
+		if(viewPlayer !is null && currentPlayerID != viewPlayer.User.Login && viewPlayer.User.Login != "")
+		{
+			currentPlayerID = viewPlayer.User.Login;
+			//EndOfRoundReset();
+		}
+		else
+			currentPlayerID = TMData.dPlayerInfo.Login;
+
 		UpdateLabels();
 		
 		if(firstSafePosition < 1)
