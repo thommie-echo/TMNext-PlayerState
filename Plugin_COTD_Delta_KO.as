@@ -132,7 +132,11 @@ void UpdateLabels()
 	int numPlayers = Text::ParseInt(lbl_Players.Value);
 	int numKOs = GetNumKOs(numPlayers, lbl_KOs.Value);
 	
-	firstSafePosition = numPlayers - numKOs;
+	int newSafePosition = numPlayers - numKOs;
+	if(newSafePosition != firstSafePosition)
+		EndOfRoundReset();
+	
+	firstSafePosition = newSafePosition;
 }
 
 int GetNumKOs(int numPlayers, const string &in KOString)
@@ -150,7 +154,7 @@ int GetNumKOs(int numPlayers, const string &in KOString)
 
 CustomPlayerData@ GetPlayerData(const string &in Login)
 {	
-	for(int i = 0; i < OnlinePlayers.get_Length(); i++)
+	for(uint i = 0; i < OnlinePlayers.get_Length(); i++)
 	{
 		if(Login == OnlinePlayers[i].Login)
 			return OnlinePlayers[i];
@@ -197,37 +201,40 @@ class CustomPlayerData
 				if(CPTime > 0)
 					CPTimes.InsertLast(CPTime);
 			}
+			LatestCPTime = CPTimes[NumCPs -1];
 		}
 	}
 	
-	bool CopyFrom(CustomPlayerData UpdatedPlayer, int NumberOfCheckpoints) // returns true if a new checkpoint has been passed
+	bool CopyFrom(CustomPlayerData UpdatedPlayer) // returns true if a new checkpoint has been passed
 	{
 		bool Result = false;
-		if(NumCPs < UpdatedPlayer.NumCPs)
-		{
-			LatestCPTime = UpdatedPlayer.CPTimes[UpdatedPlayer.NumCPs -1];
-			Log(4, "Player " + UpdatedPlayer.Login + " has new CP, index: " + UpdatedPlayer.NumCPs + " with time: " + LatestCPTime);
-			Result = true;
-		}
 		
-		if(UpdatedPlayer.StartTime != StartTime)
+		bRestarted = false;
+		
+		if(UpdatedPlayer.NumCPs < NumCPs || StartTime != UpdatedPlayer.StartTime) // we've restarted
+		{
 			bRestarted = true;
-		else
-			bRestarted = false;
-		
-		NumCPs = UpdatedPlayer.NumCPs;
-		//CPTimes = UpdatedPlayer.CPTimes;
-		for(int i = 0; i < UpdatedPlayer.CPTimes.Length; i++)
-		{
-			CPTimes.InsertLast(UpdatedPlayer.CPTimes[i]);
-		}
-		if(CPTimes.Length > 0)
-			LatestCPTime = CPTimes[NumCPs -1];
-		else
+			
+			StartTime = UpdatedPlayer.StartTime;
+			
+			if(CPTimes.Length > 0)
+				CPTimes.RemoveRange(0,CPTimes.Length);
+				
 			LatestCPTime = 0;
+			NumCPs = 0;
+		}
+		else if(UpdatedPlayer.NumCPs > NumCPs) // we've passed a new cp
+		{
+			Result = true;
+			
+			CPTimes.InsertLast(UpdatedPlayer.LatestCPTime);
+			LatestCPTime = UpdatedPlayer.LatestCPTime;
+			NumCPs = CPTimes.Length;
+			
+			Log(4, "Player " + UpdatedPlayer.Login + " has new CP, index: " + UpdatedPlayer.NumCPs + " with time: " + LatestCPTime);
+		}
 		
 		CurrentRaceTime = UpdatedPlayer.CurrentRaceTime;
-		StartTime = UpdatedPlayer.StartTime;
 		
 		return Result;
 	}
@@ -256,7 +263,7 @@ void GetPlayersFromString(const string &in input)
 			{
 				if(lPlayers[i].Login == OnlinePlayers[j].Login)
 				{
-					if(OnlinePlayers[j].CopyFrom(lPlayers[i], TMData.dMapInfo.NumberOfCheckpoints))
+					if(OnlinePlayers[j].CopyFrom(lPlayers[i]))
 					{
 						InsertCPTime(OnlinePlayers[j].LatestCPTime, OnlinePlayers[j].NumCPs);
 					}
@@ -268,6 +275,14 @@ void GetPlayersFromString(const string &in input)
 			if(!bFoundPlayer)
 			{
 				OnlinePlayers.InsertLast(lPlayers[i]);
+				
+				if(lPlayers[i].NumCPs > 0)
+				{
+					for(int x = 0; x < lPlayers[i].NumCPs; x++)
+					{
+						InsertCPTime(lPlayers[i].CPTimes[x], x + 1);
+					}
+				}
 			}
 		}
 	}
@@ -276,9 +291,16 @@ void GetPlayersFromString(const string &in input)
 		for(i = 0; i < lPlayers.get_Length(); i++)
 		{
 			OnlinePlayers.InsertLast(lPlayers[i]);
+			
+			if(lPlayers[i].NumCPs > 0)
+			{
+				for(int x = 0; x < lPlayers[i].NumCPs; x++)
+				{
+					InsertCPTime(lPlayers[i].CPTimes[x], x + 1);
+				}
+			}
 		}
 	}
-	
 }
 
 
@@ -306,51 +328,43 @@ void RenderNextCPTime()
 	
 	if(currentPlayer.CPTimes.Length == 0) // player has not passed a CP
 	{
-		if(CPInfos.Length > 0 && CPInfos[0].Times.Length >= firstSafePosition) // check if enough people have already passed the first CP
+		if(CPInfos.Length > 0 && int(CPInfos[0].Times.Length) >= firstSafePosition && firstSafePosition > 0) // check if enough people have already passed the first CP
 		{
 			timeDiff = currentPlayer.CurrentRaceTime - CPInfos[0].Times[firstSafePosition -1];
 			bLiveTime = true;
-			//print("test8");
 		}
 		else
 		{
-			timeDiff = lastDiff;
-			//print("test7");
+			timeDiff = 0;
 		}
 	}
 	else // player has passed at least one cp
 	{
 		int playerCPNum = currentPlayer.CPTimes.Length -1;
-		if(CPInfos.Length > playerCPNum && CPInfos[playerCPNum + 1].Times.Length >= firstSafePosition) // next cp time
+		if(int(CPInfos.Length) > playerCPNum && int(CPInfos[playerCPNum + 1].Times.Length) >= firstSafePosition) // next cp time
 		{
 			timeDiff = currentPlayer.CurrentRaceTime - CPInfos[playerCPNum + 1].Times[firstSafePosition -1];
 			bLiveTime = true;
-			//print("test5");
 		}
-		else if(CPInfos[playerCPNum].Times.Length >= firstSafePosition) // At least all the safe people have passed the same CP as the player
+		else if(int(CPInfos[playerCPNum].Times.Length) >= firstSafePosition) // At least all the safe people have passed the same CP as the player
 		{
 			int playerIndex = CPInfos[playerCPNum].Times.Find(currentPlayer.LatestCPTime);
 			if(playerIndex == -1) // Somehow the player has passed this CP but we can't find their time in the list
 			{
-				//print("test4");
 				timeDiff = 0;
 			}
 			else if(playerIndex >= firstSafePosition) // player in ko
 			{
-				//print("test3");
 				timeDiff = currentPlayer.LatestCPTime - CPInfos[playerCPNum].Times[firstSafePosition -1];
 			}
 			else // player in safe position
 			{
-				if(CPInfos[playerCPNum].Times.Length > 0 && CPInfos[playerCPNum].Times.Length > firstSafePosition) // Check if the first KO person has already passed the CP
+				if(CPInfos[playerCPNum].Times.Length > 0 && int(CPInfos[playerCPNum].Times.Length) > firstSafePosition) // Check if the first KO person has already passed the CP
 				{
-					
 					timeDiff = currentPlayer.LatestCPTime - CPInfos[playerCPNum].Times[firstSafePosition];
-					//print("test  " + timeDiff);
 				}
 				else // We've passed the CP, so has the last safe person, but not the first KO position
 				{
-					//print("tes2");
 					timeDiff = currentPlayer.LatestCPTime - currentPlayer.CurrentRaceTime;
 					bLiveTime = true;
 				}
@@ -360,13 +374,11 @@ void RenderNextCPTime()
 		{
 			timeDiff = currentPlayer.LatestCPTime - currentPlayer.CurrentRaceTime;
 			bLiveTime = true;
-			//print("test6");
 		}
 	}
 	
 	if(timeDiff > 0)
 		lastDiff = timeDiff;
-	//print("" + timeDiff);
 	
 	nvg::FontFace(m_font);
 	if(bLiveTime)
@@ -450,7 +462,7 @@ void InsertCPTime(uint CPTime, int CPNum)
 		CreateCPInfos();
 		
 	CPInfos[CPNum - 1].Times.InsertLast(CPTime);
-	if(CPInfos[CPNum - 1].Times.Length > firstSafePosition - 1)
+	if(int(CPInfos[CPNum - 1].Times.Length) > firstSafePosition - 1)
 		CPInfos[CPNum - 1].Times.SortAsc();	
 }
 
@@ -468,7 +480,6 @@ void CreateCPInfos()
 
 void EndOfRoundReset()
 {
-	print("resetting");
 	firstSafePosition = -1;
 
 	CreateCPInfos();
@@ -497,12 +508,9 @@ void Render()
 		
 		CSmPlayer@ viewPlayer;
 		@viewPlayer	= GetViewingPlayer();
-		
-		if(viewPlayer !is null && currentPlayerID != viewPlayer.User.Login && viewPlayer.User.Login != "")
-		{
+
+		if(viewPlayer !is null)
 			currentPlayerID = viewPlayer.User.Login;
-			//EndOfRoundReset();
-		}
 		else
 			currentPlayerID = TMData.dPlayerInfo.Login;
 
