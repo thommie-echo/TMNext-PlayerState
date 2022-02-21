@@ -29,18 +29,23 @@ vec4 colour_White = vec4(1, 1, 1, 1);
 [Setting name="Log detail level"]
 int logDetailLevel = 0;
 
+[Setting name="Count retired"]
+int countRetired;
 
 string currentPlayerID = "";
 CustomPlayerData@ currentPlayer;
 
 int firstSafePosition = -1;
 int targetCPTime = -1;
+int KOCount = -1;
 
 string NumberFont = "DroidSans.ttf";
 Resources::Font@ m_font;
 
 CGameManialinkLabel@ lbl_Players;
 CGameManialinkLabel@ lbl_KOs;
+
+int numMapCPs;
 
 int lastDiff = 0;
 
@@ -104,7 +109,10 @@ void GetUILayer()
 	{
 		auto layer = cast<CGameUILayer>(UIMgr.UILayers[i]);
 		if(layer.ManialinkPageUtf8.Contains("UIModule_Knockout_KnockoutInfo"))
+		{
 			@UI_Data_Layer = layer;
+			break;
+		}
 	}
 	
 	if(UI_Data_Layer is null)
@@ -130,9 +138,9 @@ void UpdateLabels()
 		return;
 		
 	int numPlayers = Text::ParseInt(lbl_Players.Value);
-	int numKOs = GetNumKOs(numPlayers, lbl_KOs.Value);
+	KOCount = GetNumKOs(numPlayers, lbl_KOs.Value);
 	
-	int newSafePosition = numPlayers - numKOs;
+	int newSafePosition = numPlayers - KOCount;
 	if(newSafePosition != firstSafePosition)
 		EndOfRoundReset();
 	
@@ -174,6 +182,9 @@ class CustomPlayerData
 	uint StartTime;
 	uint LatestCPTime;
 	bool bRestarted;
+	bool bFinished;
+	bool bNewCP;
+	bool bDriving;
 	
 	CustomPlayerData()
 	{
@@ -207,9 +218,14 @@ class CustomPlayerData
 	
 	bool CopyFrom(CustomPlayerData UpdatedPlayer) // returns true if a new checkpoint has been passed
 	{
+		if(Login.Length < 1)
+			return false;
+			
 		bool Result = false;
 		
 		bRestarted = false;
+		bNewCP = false;
+		
 		
 		if(UpdatedPlayer.NumCPs < NumCPs || StartTime != UpdatedPlayer.StartTime) // we've restarted
 		{
@@ -226,6 +242,7 @@ class CustomPlayerData
 		else if(UpdatedPlayer.NumCPs > NumCPs) // we've passed a new cp
 		{
 			Result = true;
+			bNewCP = true;
 			
 			CPTimes.InsertLast(UpdatedPlayer.LatestCPTime);
 			LatestCPTime = UpdatedPlayer.LatestCPTime;
@@ -234,6 +251,23 @@ class CustomPlayerData
 			Log(4, "Player " + UpdatedPlayer.Login + " has new CP, index: " + UpdatedPlayer.NumCPs + " with time: " + LatestCPTime);
 		}
 		
+		if(CurrentRaceTime == UpdatedPlayer.CurrentRaceTime)
+		{
+			if(bDriving)
+			{
+				if(!bFinished)
+				{
+					bFinished = true;
+				}
+			}
+			else
+				bFinished = false;
+		}
+		else
+			bFinished = false;
+		
+		
+		bDriving = CurrentRaceTime != UpdatedPlayer.CurrentRaceTime;
 		CurrentRaceTime = UpdatedPlayer.CurrentRaceTime;
 		
 		return Result;
@@ -258,14 +292,25 @@ void GetPlayersFromString(const string &in input)
 	{
 		for(i = 0; i < lPlayers.get_Length(); i++)
 		{
+			if(OnlinePlayers[i].Login == lPlayers[i].Login)
+				j = i;
+			else
+				j = 0;
+				
 			bFoundPlayer = false;
-			for(j = 0; j < OnlinePlayers.get_Length(); j++)
+			
+			for(; j < OnlinePlayers.get_Length(); j++)
 			{
 				if(lPlayers[i].Login == OnlinePlayers[j].Login)
 				{
-					if(OnlinePlayers[j].CopyFrom(lPlayers[i]))
+					OnlinePlayers[j].CopyFrom(lPlayers[i]);
+					if(OnlinePlayers[j].bNewCP)
 					{
 						InsertCPTime(OnlinePlayers[j].LatestCPTime, OnlinePlayers[j].NumCPs);
+					}
+					if(OnlinePlayers[j].bFinished && OnlinePlayers[j].NumCPs < numMapCPs)
+					{
+						countRetired++;
 					}
 					bFoundPlayer = true;
 					break;
@@ -326,6 +371,10 @@ void RenderNextCPTime()
 	bool bLiveTime;
 	int timeDiff = 0;
 	
+	if(currentPlayer.CurrentRaceTime < 0 && KOCount > 0)
+		KOCount = 0;
+	
+	
 	if(currentPlayer.CPTimes.Length == 0) // player has not passed a CP
 	{
 		if(CPInfos.Length > 0 && int(CPInfos[0].Times.Length) >= firstSafePosition && firstSafePosition > 0) // check if enough people have already passed the first CP
@@ -341,7 +390,7 @@ void RenderNextCPTime()
 	else // player has passed at least one cp
 	{
 		int playerCPNum = currentPlayer.CPTimes.Length -1;
-		if(int(CPInfos.Length) > playerCPNum && int(CPInfos[playerCPNum + 1].Times.Length) >= firstSafePosition) // next cp time
+		if(int(CPInfos.Length) > playerCPNum +1 && int(CPInfos[playerCPNum + 1].Times.Length) >= firstSafePosition) // next cp time
 		{
 			timeDiff = currentPlayer.CurrentRaceTime - CPInfos[playerCPNum + 1].Times[firstSafePosition -1];
 			bLiveTime = true;
@@ -377,6 +426,10 @@ void RenderNextCPTime()
 		}
 	}
 	
+	int prevCP = currentPlayer.CPTimes.Length - 2;
+	if(prevCP > -1 && CPInfos[prevCP].Times.Length > 0)
+		CPInfos[prevCP].Times.RemoveRange(0,CPInfos[prevCP].Times.Length);
+	
 	if(timeDiff > 0)
 		lastDiff = timeDiff;
 	
@@ -393,7 +446,13 @@ void RenderNextCPTime()
 
 	nvg::BeginPath();
 	nvg::FontSize(fontSize);
-	nvg::TextBox(0, YPos, XPos, GetFormattedTime(timeDiff));
+	
+	string drawString = GetFormattedTime(timeDiff);
+	
+	if(countRetired > KOCount && KOCount > -1)
+		drawString = "Safe";
+			
+	nvg::TextBox(0, YPos, XPos, drawString);
 }
 
 CSmPlayer@ GetViewingPlayer()
@@ -461,6 +520,9 @@ void InsertCPTime(uint CPTime, int CPNum)
 	if(CPInfos.Length < uint(CPNum))
 		CreateCPInfos();
 		
+	if(currentPlayer !is null && CPNum < currentPlayer.NumCPs)
+		return;
+		
 	CPInfos[CPNum - 1].Times.InsertLast(CPTime);
 	if(int(CPInfos[CPNum - 1].Times.Length) > firstSafePosition - 1)
 		CPInfos[CPNum - 1].Times.SortAsc();	
@@ -481,6 +543,7 @@ void CreateCPInfos()
 void EndOfRoundReset()
 {
 	firstSafePosition = -1;
+	countRetired = 0;
 
 	CreateCPInfos();
 }
@@ -495,6 +558,11 @@ void Render()
 		@TMData = sTMData();
 		TMData.Update(previous);
 		TMData.Compare(previous);
+		
+		numMapCPs = TMData.dMapInfo.NumberOfCheckpoints;
+		
+		if(previous.UpdateNumber == TMData.UpdateNumber) // getting the same data twice so skip this
+			return;
 		
 		if(!bEnabled)
 			return;
