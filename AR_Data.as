@@ -415,7 +415,7 @@ class sTMData
 			return;
 
 		@Player = cast<CSmPlayer>(CurrentPlayground.GameTerminals[0].ControlledPlayer);		
-		@ScriptAPI = Player.ScriptAPI;		
+		@ScriptAPI = cast<CSmScriptPlayer>(Player.ScriptAPI);		
 		if(Player is null || ScriptAPI is null)
 			return;
 		
