@@ -2,8 +2,6 @@
 #author "AR_Thommie"
 #category "Aurora"
 
-#include "AR_Data.as"
-
 [Setting name="Enabled"]
 bool bEnabled = true;
 
@@ -329,7 +327,7 @@ void RenderNextCPTime()
 	else // player has passed at least one cp
 	{
 		int playerCPNum = currentPlayer.CPTimes.Length -1;
-		if(int(CPInfos.Length) > playerCPNum && int(CPInfos[playerCPNum + 1].Times.Length) >= firstSafePosition) // next cp time
+		if(int(CPInfos.Length) > playerCPNum && int(CPInfos[playerCPNum + 1].Times.Length) >= firstSafePosition && firstSafePosition > 0) // next cp time
 		{
 			timeDiff = currentPlayer.CurrentRaceTime - CPInfos[playerCPNum + 1].Times[firstSafePosition -1];
 			bLiveTime = true;

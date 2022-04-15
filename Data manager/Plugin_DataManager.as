@@ -1,11 +1,6 @@
-#name "Data Manager"
+#name "Augmented Race Data"
 #author "AR_Thommie"
 #category "Aurora"
-
-#include "AR_Data.as"
-
-[Setting name="Write data to file"]
-bool WriteToFile = true;
 
 [Setting name="Write small log"]
 bool WriteToLog = false;
@@ -26,9 +21,6 @@ void Render()
 		@TMData = sTMData();
 		TMData.Update(previous);
 		TMData.Compare(previous);
-		if(WriteToFile)
-			TMData.WriteToFile();
-
 		
 		if(WriteToLog)
 		{

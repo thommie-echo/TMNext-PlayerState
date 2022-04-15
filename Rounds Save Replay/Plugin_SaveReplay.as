@@ -2,8 +2,6 @@
 #author "AR_Thommie"
 #category "Aurora"
 
-#include "AR_Data.as"
-
 [Setting name="Enabled"]
 bool Enabled = true;
 
