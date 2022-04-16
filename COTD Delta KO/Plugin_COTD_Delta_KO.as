@@ -1,6 +1,6 @@
 #name "COTD Delta KO"
 #author "AR_Thommie"
-#category "Aurora"
+#category "Aurora" // 331 340
 
 [Setting name="Enabled"]
 bool bEnabled = true;
@@ -328,7 +328,7 @@ void RenderNextCPTime()
 			timeDiff = currentPlayer.CurrentRaceTime - CPInfos[playerCPNum + 1].Times[firstSafePosition -1];
 			bLiveTime = true;
 		}
-		else if(int(CPInfos[playerCPNum].Times.Length) >= firstSafePosition) // At least all the safe people have passed the same CP as the player
+		else if(int(CPInfos.Length) > playerCPNum && int(CPInfos[playerCPNum].Times.Length) >= firstSafePosition) // At least all the safe people have passed the same CP as the player
 		{
 			int playerIndex = CPInfos[playerCPNum].Times.Find(currentPlayer.LatestCPTime);
 			if(playerIndex == -1) // Somehow the player has passed this CP but we can't find their time in the list
