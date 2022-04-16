@@ -4,3 +4,6 @@ author = "Thommie"
 category = "Race"
 siteid = 632
 version = "1.0.0"
+
+[script]
+dependencies = [ "PlayerState" ]

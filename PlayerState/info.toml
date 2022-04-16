@@ -1,0 +1,10 @@
+[meta]
+name = "PlayerState"
+author = "Thommie"
+category = "Race"
+siteid = 632
+version = "1.0.1"
+
+[script]
+exports = [ "Exports.as" ]
+shared_exports = [ "AR_Data.as" ]

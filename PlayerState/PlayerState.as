@@ -1,33 +1,38 @@
-#name "Augmented Race Data"
+#name "PlayerState"
 #author "AR_Thommie"
 #category "Aurora"
 
 [Setting name="Write small log"]
 bool WriteToLog = false;
 
-sTMData@ TMData;
+
+PlayerState::sTMData@ TMData;
+
 
 void Main() {
-	@TMData = sTMData();
+	@TMData = PlayerState::sTMData();
 	TMData.Update(null);
 }
 
 void Render()
 {
+	
 	if(TMData !is null)
 	{
-		sTMData@ previous = TMData;
+		PlayerState::sTMData@ previous = TMData;
 		
-		@TMData = sTMData();
+		@TMData = PlayerState::sTMData();
 		TMData.Update(previous);
 		TMData.Compare(previous);
+		
+		
 		
 		if(WriteToLog)
 		{
 			if(TMData.dEventInfo.CheckpointChange)
 				print("checkpoint change: " + TMData.dPlayerInfo.NumberOfCheckpointsPassed + "/" + (TMData.dMapInfo.NumberOfCheckpoints + 1));
 			if(TMData.dEventInfo.PlayerStateChange)
-				print("state: " + EPlayerStateToString(TMData.PlayerState) + " at: " + TMData.dPlayerInfo.CurrentRaceTime);
+				print("state: " + PlayerState::EPlayerStateToString(TMData.PlayerState) + " at: " + TMData.dPlayerInfo.CurrentRaceTime);
 			if(TMData.dEventInfo.MapChange)
 				print("MapChange: " + TMData.dMapInfo.EdChallengeId);
 			if(TMData.dEventInfo.PauseChange)
@@ -46,3 +51,12 @@ void Render()
 	}
 	
 }
+
+namespace PlayerState
+{
+	sTMData@ GetRaceData()
+	{
+		return TMData;
+	}
+}
+

@@ -38,7 +38,7 @@ Resources::Font@ m_font;
 CGameManialinkLabel@ lbl_Players;
 CGameManialinkLabel@ lbl_KOs;
 
-sTMData@ TMData;
+PlayerState::sTMData@ TMData;
 
 CustomPlayerData[] OnlinePlayers;
 CPInfo[] CPInfos;
@@ -63,11 +63,7 @@ void Main()
 {
 	@m_font = Resources::GetFont(NumberFont);
 	
-	OnlinePlayers.Reserve(64);
-	
-	@TMData = sTMData();
-	TMData.Update(null);
-	
+	OnlinePlayers.Reserve(64);	
 	GetUILayer();
 }
 
@@ -474,15 +470,12 @@ void EndOfRoundReset()
 
 void Render()
 {
+	PlayerState::sTMData@ previous = TMData;
+	@TMData = PlayerState::GetRaceData();
+	
 	if(TMData !is null)
-	{
-		sTMData@ previous = TMData;
-		
-		@TMData = sTMData();
-		TMData.Update(previous);
-		TMData.Compare(previous);
-		
-		if(previous.UpdateNumber == TMData.UpdateNumber) // getting the same data twice so skip this
+	{	
+		if(previous !is null && previous.UpdateNumber == TMData.UpdateNumber) // getting the same data twice so skip this
 			return;
 		
 		if(!bEnabled)

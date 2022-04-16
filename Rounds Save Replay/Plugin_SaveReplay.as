@@ -9,7 +9,7 @@ string SaveFolder = "Send To Mooney\\";
 string ReplaysFolder = "\\Replays\\";
 string UserFolder = "";
 
-sTMData@ TMData;
+PlayerState::sTMData@ TMData;
 
 void CheckFolders()
 {
@@ -29,8 +29,6 @@ void CheckFolders()
 void Main() 
 {
 	CheckFolders();
-	@TMData = sTMData();
-	TMData.Update(null);
 }
 
 void WriteFile(string FileName)
@@ -77,13 +75,11 @@ void SaveReplay()
 
 void Render()
 {
+	@TMData = PlayerState::GetRaceData();	
+	
 	if(TMData !is null && Enabled && TMData.dServerInfo.CurGameModeStr.Contains("TM_Rounds_Online"))
 	{
-		sTMData@ previous = TMData;
-		
-		@TMData = sTMData();
-		TMData.Update(previous);
-		TMData.Compare(previous);
+		//@TMData = AugmentedRaceData::GetRaceData();
 
 		if(TMData.dEventInfo.EndRun)
 			SaveReplay();
