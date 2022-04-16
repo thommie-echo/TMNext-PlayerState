@@ -2,8 +2,8 @@
 name = "PlayerState"
 author = "Thommie"
 category = "Race"
-siteid = 632
-version = "1.0.1"
+siteid = 198
+version = "1.0.2"
 
 [script]
 exports = [ "Exports.as" ]
