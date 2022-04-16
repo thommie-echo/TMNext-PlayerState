@@ -3,7 +3,7 @@ name = "PlayerState"
 author = "Thommie"
 category = "Race"
 siteid = 198
-version = "1.0.2"
+version = "1.0.1"
 
 [script]
 exports = [ "Exports.as" ]

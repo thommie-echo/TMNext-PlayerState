@@ -31,6 +31,8 @@ string currentPlayerID = "";
 CustomPlayerData@ currentPlayer;
 
 int firstSafePosition = -1;
+int KOCount;
+int numPlayers;
 
 string NumberFont = "DroidSans.ttf";
 Resources::Font@ m_font;
@@ -124,8 +126,8 @@ void UpdateLabels()
 	if(lbl_Players is null || lbl_KOs is null)
 		return;
 		
-	int numPlayers = Text::ParseInt(lbl_Players.Value);
-	int KOCount = GetNumKOs(numPlayers, lbl_KOs.Value);
+	numPlayers = Text::ParseInt(lbl_Players.Value);
+	KOCount = GetNumKOs(numPlayers, lbl_KOs.Value);
 	
 	int newSafePosition = numPlayers - KOCount;
 	if(newSafePosition != firstSafePosition)
@@ -288,7 +290,7 @@ void GetPlayersFromString(const string &in input)
 
 void RenderNextCPTime()
 {
-	if(CPInfos.Length == 0)
+	if(CPInfos.Length == 0 && KOCount == 0)
 		return;
 		
 	if(currentPlayer is null || (currentPlayer.Login != currentPlayerID && currentPlayerID != ""))
@@ -323,12 +325,12 @@ void RenderNextCPTime()
 	else // player has passed at least one cp
 	{
 		int playerCPNum = currentPlayer.CPTimes.Length -1;
-		if(int(CPInfos.Length) > playerCPNum && int(CPInfos[playerCPNum + 1].Times.Length) >= firstSafePosition && firstSafePosition > 0) // next cp time
+		if(int(CPInfos.Length) > playerCPNum && int(CPInfos[playerCPNum + 1].Times.Length) >= firstSafePosition) // next cp time
 		{
 			timeDiff = currentPlayer.CurrentRaceTime - CPInfos[playerCPNum + 1].Times[firstSafePosition -1];
 			bLiveTime = true;
 		}
-		else if(int(CPInfos.Length) > playerCPNum && int(CPInfos[playerCPNum].Times.Length) >= firstSafePosition) // At least all the safe people have passed the same CP as the player
+		else if(int(CPInfos[playerCPNum].Times.Length) >= firstSafePosition) // At least all the safe people have passed the same CP as the player
 		{
 			int playerIndex = CPInfos[playerCPNum].Times.Find(currentPlayer.LatestCPTime);
 			if(playerIndex == -1) // Somehow the player has passed this CP but we can't find their time in the list
@@ -439,9 +441,6 @@ void InsertCPTime(uint CPTime, int CPNum)
 {
 	if(CPInfos.Length < uint(CPNum))
 		CreateCPInfos();
-		
-	if(currentPlayer !is null && CPNum < currentPlayer.NumCPs)
-		return;
 		
 	CPInfos[CPNum - 1].Times.InsertLast(CPTime);
 	if(int(CPInfos[CPNum - 1].Times.Length) > firstSafePosition - 1)
