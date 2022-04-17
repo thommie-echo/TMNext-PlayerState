@@ -69,8 +69,58 @@ namespace PlayerState
 		sEventInfo@ dEventInfo;
 		sMLData@ dMLData; // Serialized on the second line, separately from the above
 		
-		wstring Data_ML = ""; // Used to store the manialink to create UI and retrieve data
-		string Data_ML_FileName = "AR_DataML.txt"; // Filename of the manialink
+		wstring Data_ML = """<label pos="145 -81" z-index="0" size="1 1" text="1" style="TextValueSmallSm" valign="center2" halign="center" id="LocalPlayer" opacity="0"/>
+							<label pos="145 -81" z-index="0" size="1 1" text="1" style="TextValueSmallSm" valign="center2" halign="center" id="NumCPs" opacity="0"/> 
+							<label pos="145 -81" z-index="0" size="1 1" text="1" style="TextValueSmallSm" valign="center2" halign="center" id="PlayerLastCheckpointTime" opacity="0"/>
+							<label pos="50 -61" z-index="0" size="20 16" text="1" style="TextValueSmallSm" valign="center2" halign="center" id="AllPlayers" opacity="0"/> 
+							<script><!-- #Include "TextLib" as TL  
+							declare CMlLabel L1 <=> (Page.GetFirstChild("LocalPlayer") as CMlLabel); 
+							declare CMlLabel L2 <=> (Page.GetFirstChild("NumCPs") as CMlLabel); 
+							declare CMlLabel L3 <=> (Page.GetFirstChild("PlayerLastCheckpointTime") as CMlLabel); 
+							declare CMlLabel A1 <=> (Page.GetFirstChild("AllPlayers") as CMlLabel); 
+
+							while(True) 
+							{ 
+								yield; 
+								declare Text FullTime = "";
+								declare Integer NumCPs = 0; 	
+								declare Text FullText = "";
+								declare Text LastTime = "0";
+								declare Text CurrentRaceTime = "-10000";
+								
+								foreach(Player in Players) 
+								{ 
+									
+									if(Player.Login == LocalUser.Login)
+									{
+										NumCPs = Player.RaceWaypointTimes.count;
+										if(Player.RaceWaypointTimes.count > 0) 
+										{
+											foreach (Time in Player.RaceWaypointTimes) 
+											{ 
+												FullTime = FullTime ^ Time ^ ","; 
+												LastTime = TL::ToText(Time);
+											}
+										}
+									}
+									
+									declare Text PlayerText = Player.Login ^ ",@," ^ TL::ToText(Player.StartTime) ^ ",@," ^ TL::ToText(Player.CurrentRaceTime) ^ ",@," ^ Player.RaceWaypointTimes.count ^ ",@,";
+									declare Text CPText = "";
+									
+									foreach (Time in Player.RaceWaypointTimes) 
+									{ 
+										CPText = CPText ^ Time ^ ","; 
+									}
+									
+									PlayerText = PlayerText ^ CPText;
+									FullText = FullText ^ PlayerText ^ ",$,$,";
+								}
+								L1.SetText(TL::ToText(NumCPs) ^ ",," ^FullTime);
+								L2.SetText(TL::ToText(NumCPs));
+								L3.SetText(LastTime);
+								A1.SetText(FullText);
+							} 
+							--></script>""";
 		
 		sTMData()
 		{
@@ -101,22 +151,6 @@ namespace PlayerState
 			return EPlayerState::EPlayerState_Menus; // Not sure if this ever happens, but it only could happen on the first iteration or when no previous data is supplied (which you should always do if possible)
 		}
 		
-		// Used to load the manialink string in memory or return it if that's already been done
-		wstring GetDataML()
-		{
-			if(Data_ML != "")
-				return Data_ML;
-				
-			IO::FileSource indexFile("AR_DataML.txt");
-			string line = indexFile.ReadLine();
-			
-			while(!indexFile.EOF())
-			{
-				line = line + indexFile.ReadLine();
-			}
-			Data_ML = line;
-			return Data_ML;
-		}
 
 		// Returns the layer in the player's UI or creates it if there is none (i.e. after leaving the menu)
 		CGameUILayer@ GetLayer(wstring manialink, const string &in id, CGameManiaAppPlayground@ UIMgr, CGamePlaygroundUIConfig@ clientUI)
@@ -150,7 +184,7 @@ namespace PlayerState
 				UpdateNumber = previous.UpdateNumber;
 			else
 			{
-				if(previous.UpdateNumber == 4294967294)
+				if(previous.UpdateNumber == 0xFFFFFFFE)
 					UpdateNumber = 0;
 				else
 					UpdateNumber = previous.UpdateNumber + 1;
@@ -398,7 +432,7 @@ namespace PlayerState
 			if(clientUI is null)
 				return;
 				
-			@UI_Data_Layer = this.GetLayer(this.GetDataML(), "AR_Data", UIMgr, clientUI);
+			@UI_Data_Layer = this.GetLayer(Data_ML, "AR_Data", UIMgr, clientUI);
 			auto ML_localpage = cast<CGameManialinkPage>(UI_Data_Layer.LocalPage);//We load Manialink page to function like "GetFirstChild"
 			if(ML_localpage is null)
 				return;
