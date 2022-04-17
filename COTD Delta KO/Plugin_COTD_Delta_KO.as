@@ -171,7 +171,6 @@ class CustomPlayerData
 	uint StartTime;
 	uint LatestCPTime;
 	bool bRestarted;
-	bool bNewCP;
 	
 	CustomPlayerData()
 	{
@@ -205,12 +204,9 @@ class CustomPlayerData
 	
 	bool CopyFrom(CustomPlayerData UpdatedPlayer) // returns true if a new checkpoint has been passed
 	{
-		if(Login.Length < 1)
-			return false;
-			
 		bool Result = false;
+		
 		bRestarted = false;
-		bNewCP = false;
 		
 		if(UpdatedPlayer.NumCPs < NumCPs || StartTime != UpdatedPlayer.StartTime) // we've restarted
 		{
@@ -227,7 +223,6 @@ class CustomPlayerData
 		else if(UpdatedPlayer.NumCPs > NumCPs) // we've passed a new cp
 		{
 			Result = true;
-			bNewCP = true;
 			
 			CPTimes.InsertLast(UpdatedPlayer.LatestCPTime);
 			LatestCPTime = UpdatedPlayer.LatestCPTime;
@@ -264,8 +259,7 @@ void GetPlayersFromString(const string &in input)
 		{
 			if(lPlayer.Login == OnlinePlayers[j].Login)
 			{
-				OnlinePlayers[j].CopyFrom(lPlayer);
-				if(OnlinePlayers[j].bNewCP)
+				if(OnlinePlayers[j].CopyFrom(lPlayer))
 					InsertCPTime(OnlinePlayers[j].LatestCPTime, OnlinePlayers[j].NumCPs);
 				
 				bFoundPlayer = true;

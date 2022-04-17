@@ -1,13 +1,7 @@
-#name "PlayerState"
-#author "AR_Thommie"
-#category "Aurora"
-
 [Setting name="Write small log"]
 bool WriteToLog = false;
 
-
 PlayerState::sTMData@ TMData;
-
 
 void Main() {
 	@TMData = PlayerState::sTMData();
