@@ -130,14 +130,23 @@ void UpdateLabels()
 	KOCount = GetNumKOs(numPlayers, lbl_KOs.Value);
 	
 	int newSafePosition = numPlayers - KOCount;
-	if(newSafePosition != firstSafePosition)
+	if(newSafePosition != firstSafePosition && KOCount > 0)
+	{
+		print(lbl_KOs.Value);
 		EndOfRoundReset();
+	}
 	
 	firstSafePosition = newSafePosition;
 }
 
 int GetNumKOs(int numPlayers, const string &in KOString)
 {
+	string[] split = KOString.Split("");
+	
+	if(split.Length < 4)
+		return 0;
+	return Text::ParseInt(split[2]);
+	
 	if(KOString.Contains("NO KO"))
 		return 0;
 	else if(numPlayers > 16)
@@ -251,6 +260,8 @@ void GetPlayersFromString(const string &in input)
 		lPlayer = CustomPlayerData(PerPlayerString[i]);
 		if(OnlinePlayers.Length > i && OnlinePlayers[i].Login == lPlayer.Login)
 			j = i;
+		else if(OnlinePlayers.Length > j && OnlinePlayers[j].Login == lPlayer.Login)
+			j = j;
 		else
 			j = 0;
 			
@@ -319,6 +330,10 @@ void RenderNextCPTime()
 	else // player has passed at least one cp
 	{
 		int playerCPNum = currentPlayer.CPTimes.Length -1;
+		
+		if(playerCPNum < 0 || firstSafePosition < 0)
+			return;
+			
 		if(int(CPInfos.Length) > playerCPNum && int(CPInfos[playerCPNum + 1].Times.Length) >= firstSafePosition) // next cp time
 		{
 			timeDiff = currentPlayer.CurrentRaceTime - CPInfos[playerCPNum + 1].Times[firstSafePosition -1];
@@ -433,6 +448,9 @@ string GetFormattedTime(int input)
 
 void InsertCPTime(uint CPTime, int CPNum)
 {
+	if(KOCount == 0)
+		return;
+		
 	if(CPInfos.Length < uint(CPNum))
 		CreateCPInfos();
 		
