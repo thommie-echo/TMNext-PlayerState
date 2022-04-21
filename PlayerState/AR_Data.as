@@ -44,6 +44,8 @@ namespace PlayerState
 		bool HandicapChange; // True when any of the handicaps from [sPlayerInfo] change
 		bool CheckpointChange; // True when the player passes through a checkpoint, or if the run is ended [sPlayerInfo.LatestCheckpointLandmarkIndex]
 		bool LapChange; // TODO: add this to Json
+		bool bRespawned; // True when the player has just respawned a checkpoint
+		bool bRespawnChange; // True when the player has just started or ended the respawn
 	}
 
 	shared class sMLData
@@ -274,7 +276,23 @@ namespace PlayerState
 					StartRun();
 			}
 			
-			
+			dEventInfo.bRespawned = previous.dEventInfo.bRespawned;
+			dEventInfo.bRespawnChange = false;
+			if(PlayerState == EPlayerState::EPlayerState_Driving)
+			{
+				if(dEventInfo.bRespawned && dPlayerInfo.Speed != previous.dPlayerInfo.Speed)
+				{
+					dEventInfo.bRespawned = false;
+					dEventInfo.bRespawnChange = true;
+				}
+				if(dPlayerInfo.NbRespawnsRequested > previous.dPlayerInfo.NbRespawnsRequested)
+				{
+					dEventInfo.bRespawned = true;
+					dEventInfo.bRespawnChange = true;
+					dPlayerInfo.RespawnTime = dPlayerInfo.CurrentRaceTime;
+				}	
+			}
+				
 
 			// Check for changes in any handicaps
 			if(	   dPlayerInfo.HandicapNoGasDuration 		< previous.dPlayerInfo.HandicapNoGasDuration
@@ -657,6 +675,9 @@ namespace PlayerState
 		int LatestCheckpointLandmarkIndex; // CSmPlayer; starts at the maximum number of checkpoints + finish + start, after first cp goes to 0 and up from there
 		uint TrustClientSimu_ServerOverrideCount; // CSmPlayer; increases when the player ends the run
 		
+		uint RespawnTime;
+		uint NbRespawnsRequested;
+		
 		// The following only work in singleplayer
 		float Upwardness; // CSmPlayer.ScriptAPI
 		float Distance; // CSmPlayer.ScriptAPI
@@ -681,7 +702,7 @@ namespace PlayerState
 		
 		
 		void Update(CSmScriptPlayer@ ScriptAPI, CSmPlayer@ SmPlayer, int GameTime)
-		{		
+		{
 			StartTime = ScriptAPI.StartTime;
 			CurrentRaceTime = GameTime - ScriptAPI.StartTime;
 			//CurrentLapNumber = ScriptAPI.CurrentLapNumber;
@@ -717,6 +738,7 @@ namespace PlayerState
 			Name = ScriptAPI.Name;
 			LatestCheckpointLandmarkIndex = SmPlayer.CurrentLaunchedRespawnLandmarkIndex;
 			TrustClientSimu_ServerOverrideCount = SmPlayer.TrustClientSimu_ServerOverrideCount;
+			NbRespawnsRequested = ScriptAPI.Score.NbRespawnsRequested;
 		}
 	}
 } // end of namespace

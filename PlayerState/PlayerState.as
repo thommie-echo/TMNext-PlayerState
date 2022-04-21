@@ -18,8 +18,7 @@ void Render()
 		@TMData = PlayerState::sTMData();
 		TMData.Update(previous);
 		TMData.Compare(previous);
-		
-		
+
 		
 		if(WriteToLog)
 		{
@@ -41,6 +40,14 @@ void Render()
 				print("Lap change: " + (TMData.dPlayerInfo.CurrentLapNumber + 1) + "/" + TMData.dMapInfo.TMObjective_NbLaps + " at: " + TMData.dPlayerInfo.LapStartTime);
 			if(TMData.dEventInfo.FinishRun)
 				print("Finished at: " + TMData.dPlayerInfo.EndTime);
+			if(TMData.dEventInfo.bRespawnChange)
+			{
+				if(TMData.dEventInfo.bRespawned)
+					print("Player respawned at time: " + TMData.dPlayerInfo.RespawnTime);
+				else
+					print("Player regained control after respawn");
+			}
+				
 		}
 	}
 	
