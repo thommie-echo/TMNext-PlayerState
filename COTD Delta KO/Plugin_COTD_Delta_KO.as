@@ -5,6 +5,9 @@
 [Setting name="Enabled"]
 bool bEnabled = true;
 
+[Setting name="Preview screen location"]
+bool bShowTimer = true;
+
 [Setting name="XPos"]
 int XPos = 1920;
 
@@ -130,11 +133,13 @@ void UpdateLabels()
 	KOCount = GetNumKOs(numPlayers, lbl_KOs.Value);
 	
 	int newSafePosition = numPlayers - KOCount;
-	if(newSafePosition != firstSafePosition && KOCount > 0)
+	if(newSafePosition != firstSafePosition)
 	{
-		print(lbl_KOs.Value);
-		EndOfRoundReset();
+		print("KOCount: " + KOCount + " with label: " + lbl_KOs.Value);
+		if(KOCount > 0)
+			EndOfRoundReset();
 	}
+		
 	
 	firstSafePosition = newSafePosition;
 }
@@ -146,16 +151,6 @@ int GetNumKOs(int numPlayers, const string &in KOString)
 	if(split.Length < 4)
 		return 0;
 	return Text::ParseInt(split[2]);
-	
-	if(KOString.Contains("NO KO"))
-		return 0;
-	else if(numPlayers > 16)
-		return 4;
-	else if(numPlayers > 8)
-		return 2;
-	else if(numPlayers > 1)
-		return 1;
-	else return 0;
 }
 
 CustomPlayerData@ GetPlayerData(const string &in Login)
@@ -295,6 +290,18 @@ void GetPlayersFromString(const string &in input)
 
 void RenderNextCPTime()
 {
+	if(bShowTimer)
+	{
+		nvg::FontFace(m_font);
+		nvg::FillColor(colour_White);
+		nvg::TextAlign(nvg::Align::Middle | nvg::Align::Center);
+
+		nvg::BeginPath();
+		nvg::FontSize(fontSize);
+		nvg::TextBox(0, YPos, XPos, GetFormattedTime(0));
+		return;
+	}
+	
 	if(CPInfos.Length == 0 && KOCount == 0)
 		return;
 		
@@ -509,7 +516,7 @@ void Render()
 
 		UpdateLabels();
 		
-		if(firstSafePosition < 0)
+		if( (firstSafePosition < 0 || KOCount < 1) && !bShowTimer)
 			return;
 		
 		GetPlayersFromString(TMData.dMLData.AllPlayerData);
