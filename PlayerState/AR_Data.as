@@ -50,10 +50,13 @@ namespace PlayerState
 
 	shared class sMLData
 	{
+		// Login,@,StartTime,@,CurrentRaceTime,@,RaceWaypointTimes.Count,@,CP0,CP1,CP2...
 		string PlayerData; // NumCPs and all checkpoint times, separated by ",@," and "," respectively
-		string AllPlayerData; // Contains Login, the above, and CurrentRaceTime, players are separated by ",$,"
+		string AllPlayerData; // Contains Login, the above, and CurrentRaceTime, players are separated by ",$,$,"
 		int NumCPs; // Number of checkpoints the player has passed through, somehow changes to 1 when joining a server and not yet started playing, not serialized
 		int PlayerLastCheckpointTime; // 0 or the most recent checkpoint time, not serialized
+		int StartTime;
+		int CurrentRaceTime;
 	}
 
 	shared class sTMData
@@ -89,6 +92,7 @@ namespace PlayerState
 								declare Text FullText = "";
 								declare Text LastTime = "0";
 								declare Text CurrentRaceTime = "-10000";
+								declare Text FullPlayerText = "";
 								
 								foreach(Player in Players) 
 								{ 
@@ -109,6 +113,11 @@ namespace PlayerState
 									declare Text PlayerText = Player.Login ^ ",@," ^ TL::ToText(Player.StartTime) ^ ",@," ^ TL::ToText(Player.CurrentRaceTime) ^ ",@," ^ Player.RaceWaypointTimes.count ^ ",@,";
 									declare Text CPText = "";
 									
+									if(Player.Login == LocalUser.Login)
+									{
+										FullPlayerText = PlayerText;
+									}
+									
 									foreach (Time in Player.RaceWaypointTimes) 
 									{ 
 										CPText = CPText ^ Time ^ ","; 
@@ -117,7 +126,7 @@ namespace PlayerState
 									PlayerText = PlayerText ^ CPText;
 									FullText = FullText ^ PlayerText ^ ",$,$,";
 								}
-								L1.SetText(TL::ToText(NumCPs) ^ ",," ^FullTime);
+								L1.SetText(FullPlayerText ^ FullTime);
 								L2.SetText(TL::ToText(NumCPs));
 								L3.SetText(LastTime);
 								A1.SetText(FullText);
@@ -464,6 +473,13 @@ namespace PlayerState
 				return;
 			
 			dMLData.PlayerData = LocalPlayer_Label.Value;
+			
+			string[] split = dMLData.PlayerData.Split(",@,");
+			if(split.Length > 3)
+			{
+				dMLData.StartTime = Text::ParseInt(split[1]);
+				dMLData.CurrentRaceTime = Text::ParseInt(split[2]);
+			}
 			dMLData.AllPlayerData = AllPlayers_Label.Value;
 			dMLData.NumCPs = Text::ParseInt(NumCPs_Label.Value);
 			dMLData.PlayerLastCheckpointTime = Text::ParseInt(PlayerLastCheckpointTime_Label.Value);

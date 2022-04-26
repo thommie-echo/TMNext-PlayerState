@@ -6,7 +6,7 @@
 bool bEnabled = true;
 
 [Setting name="Preview screen location"]
-bool bShowTimer = true;
+bool bShowTimer = false;
 
 [Setting name="XPos"]
 int XPos = 1920;
@@ -48,6 +48,46 @@ PlayerState::sTMData@ TMData;
 CustomPlayerData[] OnlinePlayers;
 CPInfo[] CPInfos;
 
+string ML = """
+			<label pos="145 -81" z-index="0" size="1 1" text="1" style="TextValueSmallSm" valign="center2" halign="center" id="Playercount" opacity="0"/>
+			<label pos="145 -81" z-index="0" size="1 1" text="1" style="TextValueSmallSm" valign="center2" halign="center" id="KOcount" opacity="0"/>
+			
+			<script><!-- #Include "TextLib" as TL 
+			declare CMlLabel L1 <=> (Page.GetFirstChild("Playercount") as CMlLabel); 
+			declare CMlLabel L2 <=> (Page.GetFirstChild("KOcount") as CMlLabel);
+			declare netread Integer Net_Knockout_KnockoutInfo_PlayersNb for Teams[0] = 0;
+			declare netread Integer Net_Knockout_KnockoutInfo_KOsNumber for Teams[0] = 0;
+			
+			while(True)
+			{
+				yield;
+				
+				L1.SetText(TL::ToText(Net_Knockout_KnockoutInfo_PlayersNb));
+				L2.SetText(TL::ToText(Net_Knockout_KnockoutInfo_KOsNumber));
+				
+			}
+			--></script>""";
+			
+			
+// Returns the layer in the player's UI or creates it if there is none (i.e. after leaving the menu)
+CGameUILayer@ GetLayer(wstring manialink, const string &in id, CGameManiaAppPlayground@ UIMgr, CGamePlaygroundUIConfig@ clientUI)
+{
+	for(uint i = 0; i < clientUI.UILayers.Length; ++i) //This is used to check if we haven't already a layer with the same id, to avoid doubles
+	{
+		auto layer = cast<CGameUILayer>(clientUI.UILayers[i]);
+		if(layer.AttachId == id)
+			return layer;
+	}
+
+
+	auto injected_layer = UIMgr.UILayerCreate(); //This create a ML Layer in client UI
+	injected_layer.AttachId = id; //We'll use AttachId as a reference to get organized in which UI is what
+	injected_layer.ManialinkPage = manialink; //This is where the manialink code is
+	clientUI.UILayers.Add(injected_layer); // We add the UI Layer to player's UI
+
+	return injected_layer;// The function return the layer pointer to easily modify stuff in it
+}
+
 class CPInfo
 {
 	uint[] Times;
@@ -81,6 +121,7 @@ void GetUILayer()
 	// These are required to retrieve data from the manialink we're using
 	CGameManiaAppPlayground@ UIMgr;
 	CGameUILayer@ UI_Data_Layer = null;
+	CGamePlaygroundUIConfig@ clientUI;
 
 	
 	// Get references to all the variables we'll need and ensure we don't get any null pointer access errors
@@ -96,29 +137,19 @@ void GetUILayer()
 	@UIMgr = cast<CGameManiaAppPlayground>(Network.ClientManiaAppPlayground); //This is ClientSide ManiaApp 
 	if(UIMgr is null)
 		return;
-
-	for(uint i = 0; i < UIMgr.UILayers.Length; ++i)
-	{
-		auto layer = cast<CGameUILayer>(UIMgr.UILayers[i]);
-		if(layer.ManialinkPageUtf8.Contains("UIModule_Knockout_KnockoutInfo"))
-		{
-			@UI_Data_Layer = layer;
-			break;
-		}
-	}
-	
-	if(UI_Data_Layer is null)
+		
+	@clientUI = cast<CGamePlaygroundUIConfig>(UIMgr.ClientUI); //We access ClientSide UI class
+	if(clientUI is null)
 		return;
+		
+	@UI_Data_Layer = GetLayer(ML, "COTD_Data", UIMgr, clientUI);
 	
-	auto ML_localpage = cast<CGameManialinkPage>(UI_Data_Layer.LocalPage);
-		if(ML_localpage is null)
-			return;
-	
-	@lbl_Players = cast<CGameManialinkLabel>(ML_localpage.GetFirstChild("label-players"));
-	@lbl_KOs = cast<CGameManialinkLabel>(ML_localpage.GetFirstChild("label-KOs"));
-	
-	if(lbl_Players is null || lbl_KOs is null)
-		print("ERROR: Could not find all lables");
+	auto ML_localpage = cast<CGameManialinkPage>(UI_Data_Layer.LocalPage);//We load Manialink page to function like "GetFirstChild"
+	if(ML_localpage is null)
+		return;
+
+	@lbl_Players = cast<CGameManialinkLabel>(ML_localpage.GetFirstChild("Playercount"));
+	@lbl_KOs = cast<CGameManialinkLabel>(ML_localpage.GetFirstChild("KOcount"));	
 }
 
 void UpdateLabels()
@@ -128,29 +159,15 @@ void UpdateLabels()
 	
 	if(lbl_Players is null || lbl_KOs is null)
 		return;
-		
+	
 	numPlayers = Text::ParseInt(lbl_Players.Value);
-	KOCount = GetNumKOs(numPlayers, lbl_KOs.Value);
+	KOCount = Text::ParseInt(lbl_KOs.Value);
 	
 	int newSafePosition = numPlayers - KOCount;
-	if(newSafePosition != firstSafePosition)
-	{
-		print("KOCount: " + KOCount + " with label: " + lbl_KOs.Value);
-		if(KOCount > 0)
-			EndOfRoundReset();
-	}
+	if(newSafePosition != firstSafePosition && KOCount > 0)
+		EndOfRoundReset();
 		
-	
 	firstSafePosition = newSafePosition;
-}
-
-int GetNumKOs(int numPlayers, const string &in KOString)
-{
-	string[] split = KOString.Split("");
-	
-	if(split.Length < 4)
-		return 0;
-	return Text::ParseInt(split[2]);
 }
 
 CustomPlayerData@ GetPlayerData(const string &in Login)
@@ -162,9 +179,6 @@ CustomPlayerData@ GetPlayerData(const string &in Login)
 	}
 	return null;
 }
-
-
-
 
 class CustomPlayerData
 {
