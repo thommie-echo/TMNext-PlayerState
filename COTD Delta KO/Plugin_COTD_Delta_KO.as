@@ -5,6 +5,9 @@
 [Setting name="Enabled"]
 bool bEnabled = true;
 
+[Setting name="Disable above playercount"]
+int maxPlayerCount = 64;
+
 [Setting name="Preview screen location"]
 bool bShowTimer = false;
 
@@ -301,8 +304,7 @@ void GetPlayersFromString(const string &in input)
 	}
 }
 
-
-void RenderNextCPTime()
+void RenderPreviewTime()
 {
 	if(bShowTimer)
 	{
@@ -313,9 +315,11 @@ void RenderNextCPTime()
 		nvg::BeginPath();
 		nvg::FontSize(fontSize);
 		nvg::TextBox(0, YPos, XPos, GetFormattedTime(0));
-		return;
 	}
-	
+}
+
+void RenderNextCPTime()
+{
 	if(CPInfos.Length == 0 && KOCount == 0)
 		return;
 		
@@ -505,6 +509,8 @@ void Render()
 	PlayerState::sTMData@ previous = TMData;
 	@TMData = PlayerState::GetRaceData();
 	
+	RenderPreviewTime();
+	
 	if(TMData !is null)
 	{	
 		if(previous !is null && previous.UpdateNumber == TMData.UpdateNumber) // getting the same data twice so skip this
@@ -533,6 +539,9 @@ void Render()
 		if( (firstSafePosition < 0 || KOCount < 1) && !bShowTimer)
 			return;
 		
+		if(numPlayers > maxPlayerCount)
+			return;
+			
 		GetPlayersFromString(TMData.dMLData.AllPlayerData);
 		RenderNextCPTime();
 	}
