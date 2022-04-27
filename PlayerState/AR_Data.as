@@ -2,7 +2,7 @@ namespace PlayerState
 {
 	
 
-	string EPlayerStateToString(EPlayerState State)
+	shared string EPlayerStateToString(EPlayerState State)
 	{
 		if(State == EPlayerState::EPlayerState_Menus)
 			return "EPlayerState_Menus";
@@ -16,6 +16,8 @@ namespace PlayerState
 			return "EPlayerState_Finished";
 		else if(State == EPlayerState::EPlayerState_Spectating)
 			return "EPlayerState_Spectating";
+		else if(State == EPlayerState::EPlayerState_InEditor)
+			return "EPlayerState_InEditor";
 		return "";
 	}
 
@@ -27,6 +29,7 @@ namespace PlayerState
 		EPlayerState_EndRace, // [sPlayerInfo.CurrentRaceTime] < 0.0f && Previous PlayerState was EPlayerState_Driving ~ unsure about both of these
 		EPlayerState_Finished, // [sPlayerInfo.LatestCheckpointLandmarkIndex]  == [sMapInfo.NumberOfCheckpoints]      (CurrentPlayground.ReplayRecord.Ghosts > previous amount of ghosts)
 		EPlayerState_Spectating, // [IsSpectator]
+		EPlayerState_InEditor, // [app.Editor] !is null
 	}
 	
 	
@@ -155,10 +158,10 @@ namespace PlayerState
 				return EPlayerState::EPlayerState_Countdown;
 			if(ScriptAPI.Post == CSmScriptPlayer::EPost::CarDriver && previous !is null && previous.PlayerState == EPlayerState::EPlayerState_Countdown) // Only go to driving if you were counting down previously
 				return EPlayerState::EPlayerState_Driving;
-				
+			
 			if(previous !is null) // If in doubt, copy the prior version
 				return previous.PlayerState;
-				
+			
 			return EPlayerState::EPlayerState_Menus; // Not sure if this ever happens, but it only could happen on the first iteration or when no previous data is supplied (which you should always do if possible)
 		}
 		
@@ -173,12 +176,11 @@ namespace PlayerState
 					return layer;
 			}
 
-
 			auto injected_layer = UIMgr.UILayerCreate(); //This create a ML Layer in client UI
 			injected_layer.AttachId = id; //We'll use AttachId as a reference to get organized in which UI is what
 			injected_layer.ManialinkPage = manialink; //This is where the manialink code is
 			clientUI.UILayers.Add(injected_layer); // We add the UI Layer to player's UI
-
+			
 			return injected_layer;// The function return the layer pointer to easily modify stuff in it
 		}
 
@@ -412,8 +414,20 @@ namespace PlayerState
 			
 			// Get references to all the variables we'll need and ensure we don't get any null pointer access errors
 			@app = GetApp();
-			if(app is null || app.CurrentPlayground is null)
+			if(app is null)
 				return;
+				
+			if(cast<CGameCtnEditorFree>(app.Editor) !is null)
+			{
+				PlayerState = EPlayerState::EPlayerState_InEditor;
+				return;
+			}
+			
+			if(app.CurrentPlayground is null)
+			{
+				PlayerState = EPlayerState::EPlayerState_Menus;
+				return;
+			}
 			
 			@CurrentPlayground = cast<CSmArenaClient>(app.CurrentPlayground);
 			if(CurrentPlayground is null) // We're in menu
@@ -450,6 +464,9 @@ namespace PlayerState
 			dPlayerInfo.Update(ScriptAPI, Player, dGameInfo.GameTime);
 			PlayerState = GetPlayerState(ScriptAPI, previous);
 			
+			if(PlayerState == EPlayerState::EPlayerState_Menus)
+				return;
+			
 			// All this is needed to get the UI labels to retrieve the values we set in the manialink
 			@UIMgr = cast<CGameManiaAppPlayground>(Network.ClientManiaAppPlayground); //This is ClientSide ManiaApp 
 			if(UIMgr is null)
@@ -458,17 +475,17 @@ namespace PlayerState
 			@clientUI = cast<CGamePlaygroundUIConfig>(UIMgr.ClientUI); //We access ClientSide UI class
 			if(clientUI is null)
 				return;
-				
+			
 			@UI_Data_Layer = this.GetLayer(Data_ML, "AR_Data", UIMgr, clientUI);
 			auto ML_localpage = cast<CGameManialinkPage>(UI_Data_Layer.LocalPage);//We load Manialink page to function like "GetFirstChild"
 			if(ML_localpage is null)
 				return;
-
+			
 			auto LocalPlayer_Label = cast<CGameManialinkLabel>(ML_localpage.GetFirstChild("LocalPlayer"));
 			auto AllPlayers_Label = cast<CGameManialinkLabel>(ML_localpage.GetFirstChild("AllPlayers"));
 			auto NumCPs_Label = cast<CGameManialinkLabel>(ML_localpage.GetFirstChild("NumCPs"));
 			auto PlayerLastCheckpointTime_Label = cast<CGameManialinkLabel>(ML_localpage.GetFirstChild("PlayerLastCheckpointTime"));
-			
+					
 			if(LocalPlayer_Label is null || AllPlayers_Label is null || NumCPs_Label is null || PlayerLastCheckpointTime_Label is null)
 				return;
 			
