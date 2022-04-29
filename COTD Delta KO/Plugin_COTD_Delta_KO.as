@@ -2,9 +2,6 @@
 #author "AR_Thommie"
 #category "Aurora" // 331 340
 
-[Setting name="Enabled"]
-bool bEnabled = true;
-
 [Setting name="Disable above playercount"]
 int maxPlayerCount = 64;
 
@@ -29,27 +26,24 @@ vec4 colour_Green = vec4(1, 0, 0, 1);
 [Setting name="Live difference colour" color]
 vec4 colour_White = vec4(1, 1, 1, 1);
 
-[Setting name="Log detail level"]
-int logDetailLevel = 0;
-
-
+// To allow for showing the difference of spectated players
 string currentPlayerID = "";
 CustomPlayerData@ currentPlayer;
 
-int firstSafePosition = -1;
-int KOCount;
-int numPlayers;
+int firstSafePosition = -1; // This is the last position to qualify for the next round
+int KOCount; // Number of KOs this round, 0 if warm-up or first round
+int numPlayers; // Number of players in the round
 
 string NumberFont = "DroidSans.ttf";
 Resources::Font@ m_font;
 
-CGameManialinkLabel@ lbl_Players;
-CGameManialinkLabel@ lbl_KOs;
+CGameManialinkLabel@ lbl_Players; // The label containing the number of players
+CGameManialinkLabel@ lbl_KOs; // The label containing the KO count
 
-PlayerState::sTMData@ TMData;
+PlayerState::sTMData@ TMData; // The current PlayerState
 
-CustomPlayerData[] OnlinePlayers;
-CPInfo[] CPInfos;
+CustomPlayerData[] OnlinePlayers; // All players in the server
+CPInfo[] CPInfos; // All checkpoint times from all players
 
 string ML = """
 			<label pos="145 -81" z-index="0" size="1 1" text="1" style="TextValueSmallSm" valign="center2" halign="center" id="Playercount" opacity="0"/>
@@ -71,26 +65,7 @@ string ML = """
 			}
 			--></script>""";
 			
-			
-// Returns the layer in the player's UI or creates it if there is none (i.e. after leaving the menu)
-CGameUILayer@ GetLayer(wstring manialink, const string &in id, CGameManiaAppPlayground@ UIMgr, CGamePlaygroundUIConfig@ clientUI)
-{
-	for(uint i = 0; i < clientUI.UILayers.Length; ++i) //This is used to check if we haven't already a layer with the same id, to avoid doubles
-	{
-		auto layer = cast<CGameUILayer>(clientUI.UILayers[i]);
-		if(layer.AttachId == id)
-			return layer;
-	}
-
-
-	auto injected_layer = UIMgr.UILayerCreate(); //This create a ML Layer in client UI
-	injected_layer.AttachId = id; //We'll use AttachId as a reference to get organized in which UI is what
-	injected_layer.ManialinkPage = manialink; //This is where the manialink code is
-	clientUI.UILayers.Add(injected_layer); // We add the UI Layer to player's UI
-
-	return injected_layer;// The function return the layer pointer to easily modify stuff in it
-}
-
+// This contains the checkpoint times for all players on the server once they pass the corresponding checkpoint
 class CPInfo
 {
 	uint[] Times;
@@ -101,12 +76,6 @@ class CPInfo
 	}
 }
 
-void Log(int level, const string &in message)
-{
-	if(logDetailLevel >= level)
-		print(message);
-}
-
 void Main() 
 {
 	@m_font = Resources::GetFont(NumberFont);
@@ -115,15 +84,33 @@ void Main()
 	GetUILayer();
 }
 
+// Get the number of players, KOcount and the firstSafePosition
+void UpdateLabels()
+{
+	if(lbl_Players is null || lbl_KOs is null)
+		GetUILayer();
+	
+	if(lbl_Players is null || lbl_KOs is null)
+		return;
+	
+	numPlayers = Text::ParseInt(lbl_Players.Value);
+	KOCount = Text::ParseInt(lbl_KOs.Value);
+	
+	int newSafePosition = numPlayers - KOCount;
+	if(newSafePosition != firstSafePosition && KOCount > 0)
+		EndOfRoundReset();
+		
+	firstSafePosition = newSafePosition;
+}
+
+// This gets the manually injected UI Layer to get the data from the manialink labels
 void GetUILayer()
 {
-	// These are all variables we'll need for updating
+	// These are required to retrieve data from the manialink we're using
 	CGameCtnApp@ app;
 	CGameCtnNetwork@ Network;
-
-	// These are required to retrieve data from the manialink we're using
 	CGameManiaAppPlayground@ UIMgr;
-	CGameUILayer@ UI_Data_Layer = null;
+	CGameUILayer@ UI_Data_Layer;
 	CGamePlaygroundUIConfig@ clientUI;
 
 	
@@ -147,7 +134,7 @@ void GetUILayer()
 		
 	@UI_Data_Layer = GetLayer(ML, "COTD_Data", UIMgr, clientUI);
 	
-	auto ML_localpage = cast<CGameManialinkPage>(UI_Data_Layer.LocalPage);//We load Manialink page to function like "GetFirstChild"
+	auto ML_localpage = cast<CGameManialinkPage>(UI_Data_Layer.LocalPage); //We load Manialink page to function like "GetFirstChild"
 	if(ML_localpage is null)
 		return;
 
@@ -155,24 +142,27 @@ void GetUILayer()
 	@lbl_KOs = cast<CGameManialinkLabel>(ML_localpage.GetFirstChild("KOcount"));	
 }
 
-void UpdateLabels()
+// Returns the layer in the player's UI or creates it if there is none (i.e. after leaving the menu)
+CGameUILayer@ GetLayer(wstring manialink, const string &in id, CGameManiaAppPlayground@ UIMgr, CGamePlaygroundUIConfig@ clientUI)
 {
-	if(lbl_Players is null || lbl_KOs is null)
-		GetUILayer();
-	
-	if(lbl_Players is null || lbl_KOs is null)
-		return;
-	
-	numPlayers = Text::ParseInt(lbl_Players.Value);
-	KOCount = Text::ParseInt(lbl_KOs.Value);
-	
-	int newSafePosition = numPlayers - KOCount;
-	if(newSafePosition != firstSafePosition && KOCount > 0)
-		EndOfRoundReset();
-		
-	firstSafePosition = newSafePosition;
+	for(uint i = 0; i < clientUI.UILayers.Length; ++i) //This is used to check if we haven't already a layer with the same id, to avoid doubles
+	{
+		auto layer = cast<CGameUILayer>(clientUI.UILayers[i]);
+		if(layer.AttachId == id)
+			return layer;
+	}
+
+
+	auto injected_layer = UIMgr.UILayerCreate(); //This create a ML Layer in client UI
+	injected_layer.AttachId = id; //We'll use AttachId as a reference to get organized in which UI is what
+	injected_layer.ManialinkPage = manialink; //This is where the manialink code is
+	clientUI.UILayers.Add(injected_layer); // We add the UI Layer to player's UI
+
+	return injected_layer;// The function return the layer pointer to easily modify stuff in it
 }
 
+
+// Tries to find the CustomPlayerData for the provided login
 CustomPlayerData@ GetPlayerData(const string &in Login)
 {	
 	for(uint i = 0; i < OnlinePlayers.get_Length(); i++)
@@ -185,18 +175,17 @@ CustomPlayerData@ GetPlayerData(const string &in Login)
 
 class CustomPlayerData
 {
-	string Login;
-	int NumCPs;
-	uint[] CPTimes;
-	uint CurrentRaceTime;
-	uint StartTime;
-	uint LatestCPTime;
-	bool bRestarted;
-	
-	CustomPlayerData()
-	{
-	}
+	string Login; // Used to search for a specific player
+	int NumCPs; // Number of checkpoints passed by player
+	uint[] CPTimes; // Contains all checkpoint times
+	uint CurrentRaceTime; // The time of the current run
+	uint StartTime; // The starttime of the current run
+	uint LatestCPTime; // The time of the latest checkpoint the player has passed, 0 if no checkpoints have been passed
+	bool bRestarted; // True when the player has just restarted the round (checkpoint times have been removed)
 
+	CustomPlayerData() {} // Don't use this please
+
+	// input is split by ",@,"  into Login",@,StartTime",@,CurrentRaceTime",@,NumCPs",@,CP0,CP1,CP2...
 	CustomPlayerData(const string &in input)
 	{
 		string[] Data = input.Split(",@,");
@@ -223,10 +212,10 @@ class CustomPlayerData
 		}
 	}
 	
+	// Copies the data from the updated string to the existing player
 	bool CopyFrom(CustomPlayerData UpdatedPlayer) // returns true if a new checkpoint has been passed
 	{
-		bool Result = false;
-		
+		bool Result = false; // Whether the player has passed a new checkpoint
 		bRestarted = false;
 		
 		if(UpdatedPlayer.NumCPs < NumCPs || StartTime != UpdatedPlayer.StartTime) // we've restarted
@@ -248,8 +237,6 @@ class CustomPlayerData
 			CPTimes.InsertLast(UpdatedPlayer.LatestCPTime);
 			LatestCPTime = UpdatedPlayer.LatestCPTime;
 			NumCPs = CPTimes.Length;
-			
-			Log(4, "Player " + UpdatedPlayer.Login + " has new CP, index: " + UpdatedPlayer.NumCPs + " with time: " + LatestCPTime);
 		}
 		
 		CurrentRaceTime = UpdatedPlayer.CurrentRaceTime;
@@ -258,6 +245,7 @@ class CustomPlayerData
 	}
 }
 
+// This parses the manialink string into CustomPlayerData for each player, players are separated by ",$,$,"
 void GetPlayersFromString(const string &in input)
 {
 	string[] PerPlayerString = input.Split(",$,$,");
@@ -304,6 +292,8 @@ void GetPlayersFromString(const string &in input)
 	}
 }
 
+
+// Renders 0:00.000 on screen to adjust the position in the settings
 void RenderPreviewTime()
 {
 	if(bShowTimer)
@@ -318,6 +308,11 @@ void RenderPreviewTime()
 	}
 }
 
+// Renders the difference between 
+// 		(1) player time and current race time if the player is ahead of the first KO position (positive amount, white) (player checkpoint)
+//		(2) firstSafePosition time and current race time if the player has not yet passed the checkpoint (negative amount, white) (player checkpoint +1)
+//		(3) player cp time and first KO position cp time if both have crossed the checkpoint (positive amount, green) (player checkpoint)
+// 		(4) firstSafePosition and player cp time if both have crossed the checkpoint (negative amount, red) (player checkpoint +1)
 void RenderNextCPTime()
 {
 	if(CPInfos.Length == 0 && KOCount == 0)
@@ -329,7 +324,7 @@ void RenderNextCPTime()
 		
 		if(currentPlayer is null)
 		{
-			Log(1, "Could not find player with ID: " + currentPlayerID);
+			print("Could not find player with ID: " + currentPlayerID);
 			return;
 		}
 	}
@@ -411,6 +406,81 @@ void RenderNextCPTime()
 	nvg::TextBox(0, YPos, XPos, GetFormattedTime(timeDiff));
 }
 
+
+void InsertCPTime(uint CPTime, int CPNum)
+{
+	if(KOCount < 1)
+		return;
+		
+	if(CPInfos.Length < uint(CPNum))
+		CreateCPInfos();
+		
+	CPInfos[CPNum - 1].Times.InsertLast(CPTime);
+	if(int(CPInfos[CPNum - 1].Times.Length) > firstSafePosition - 1)
+		CPInfos[CPNum - 1].Times.SortAsc();	// We need to sort because of delays from people with slow internet
+}
+
+void CreateCPInfos()
+{
+	CPInfos.RemoveRange(0,CPInfos.Length);
+	if(TMData !is null)
+	{
+		for(int i = 0; i < TMData.dMapInfo.NumberOfCheckpoints+2; i++)
+		{
+			CPInfos.InsertLast(CPInfo());
+		}
+	}
+}
+
+// Reset some thing when the round ends
+void EndOfRoundReset()
+{
+	firstSafePosition = -1;
+	CreateCPInfos();
+}
+
+
+void Render()
+{
+	PlayerState::sTMData@ previous = TMData;
+	@TMData = PlayerState::GetRaceData();
+	
+	RenderPreviewTime();
+	
+	if(TMData !is null)
+	{	
+		if(previous !is null && previous.UpdateNumber == TMData.UpdateNumber) // getting the same data twice so skip this
+			return;
+		
+		if(!TMData.dServerInfo.CurGameModeStr.Contains("Knockout")) // Ignore everything if we're not in any form of knockout gamemode
+		{
+			if(OnlinePlayers.Length > 0)
+				OnlinePlayers.RemoveRange(0, OnlinePlayers.get_Length());
+			return;		
+		}
+		
+		CSmPlayer@ viewPlayer;
+		@viewPlayer	= GetViewingPlayer();
+
+		if(viewPlayer !is null)
+			currentPlayerID = viewPlayer.User.Login;
+		else
+			currentPlayerID = TMData.dPlayerInfo.Login;
+
+		UpdateLabels();
+		
+		if(firstSafePosition < 0 || KOCount < 1) // No KOs and no safe position, something is wrong
+			return;
+		
+		if(numPlayers > maxPlayerCount)
+			return;
+			
+		GetPlayersFromString(TMData.dMLData.AllPlayerData);
+		RenderNextCPTime();
+	}
+}
+
+
 CSmPlayer@ GetViewingPlayer()
 {
 	auto playground = GetApp().CurrentPlayground;
@@ -468,85 +538,6 @@ string GetFormattedTime(int input)
 	
 	return Result;
 }
-
-
-
-void InsertCPTime(uint CPTime, int CPNum)
-{
-	if(KOCount == 0)
-		return;
-		
-	if(CPInfos.Length < uint(CPNum))
-		CreateCPInfos();
-		
-	CPInfos[CPNum - 1].Times.InsertLast(CPTime);
-	if(int(CPInfos[CPNum - 1].Times.Length) > firstSafePosition - 1)
-		CPInfos[CPNum - 1].Times.SortAsc();	
-}
-
-void CreateCPInfos()
-{
-	CPInfos.RemoveRange(0,CPInfos.Length);
-	if(TMData !is null)
-	{
-		for(int i = 0; i < TMData.dMapInfo.NumberOfCheckpoints+2; i++)
-		{
-			CPInfos.InsertLast(CPInfo());
-		}
-	}
-}
-
-void EndOfRoundReset()
-{
-	firstSafePosition = -1;
-
-	CreateCPInfos();
-}
-
-
-void Render()
-{
-	PlayerState::sTMData@ previous = TMData;
-	@TMData = PlayerState::GetRaceData();
-	
-	RenderPreviewTime();
-	
-	if(TMData !is null)
-	{	
-		if(previous !is null && previous.UpdateNumber == TMData.UpdateNumber) // getting the same data twice so skip this
-			return;
-		
-		if(!bEnabled)
-			return;
-		
-		if(!TMData.dServerInfo.CurGameModeStr.Contains("Knockout"))
-		{
-			if(OnlinePlayers.Length > 0)
-				OnlinePlayers.RemoveRange(0, OnlinePlayers.get_Length());
-			return;		
-		}
-		
-		CSmPlayer@ viewPlayer;
-		@viewPlayer	= GetViewingPlayer();
-
-		if(viewPlayer !is null)
-			currentPlayerID = viewPlayer.User.Login;
-		else
-			currentPlayerID = TMData.dPlayerInfo.Login;
-
-		UpdateLabels();
-		
-		if( (firstSafePosition < 0 || KOCount < 1) && !bShowTimer)
-			return;
-		
-		if(numPlayers > maxPlayerCount)
-			return;
-			
-		GetPlayersFromString(TMData.dMLData.AllPlayerData);
-		RenderNextCPTime();
-	}
-}
-
 
 
 
