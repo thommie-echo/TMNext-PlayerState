@@ -8,7 +8,7 @@ void Main() {
 	TMData.Update(null);
 }
 
-void Render()
+void Update(float dt)
 {
 	
 	if(TMData !is null)

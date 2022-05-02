@@ -77,6 +77,8 @@ namespace PlayerState
 		sEventInfo@ dEventInfo;
 		sMLData@ dMLData; // Serialized on the second line, separately from the above
 		
+		CGameUILayer@ UI_Data_Layer; // DO NOT ACCESS DIRECTLY
+		
 		wstring Data_ML = """<label pos="145 -81" z-index="0" size="1 1" text="1" style="TextValueSmallSm" valign="center2" halign="center" id="LocalPlayer" opacity="0"/>
 							<label pos="145 -81" z-index="0" size="1 1" text="1" style="TextValueSmallSm" valign="center2" halign="center" id="NumCPs" opacity="0"/> 
 							<label pos="145 -81" z-index="0" size="1 1" text="1" style="TextValueSmallSm" valign="center2" halign="center" id="PlayerLastCheckpointTime" opacity="0"/>
@@ -166,16 +168,9 @@ namespace PlayerState
 		}
 		
 
-		// Returns the layer in the player's UI or creates it if there is none (i.e. after leaving the menu)
+		// Returns the layer in the player's UI or creates it if there is none (i.e. after leaving the menu), returns null if the LocalPage of the UILayer is null
 		CGameUILayer@ GetLayer(wstring manialink, const string &in id, CGameManiaAppPlayground@ UIMgr, CGamePlaygroundUIConfig@ clientUI)
 		{
-			for(uint i = 0; i < clientUI.UILayers.Length; ++i) //This is used to check if we haven't already a layer with the same id, to avoid doubles
-			{
-				auto layer = cast<CGameUILayer>(clientUI.UILayers[i]);
-				if(layer.AttachId == id)
-					return layer;
-			}
-
 			auto injected_layer = UIMgr.UILayerCreate(); //This create a ML Layer in client UI
 			injected_layer.AttachId = id; //We'll use AttachId as a reference to get organized in which UI is what
 			injected_layer.ManialinkPage = manialink; //This is where the manialink code is
@@ -409,8 +404,6 @@ namespace PlayerState
 			// These are required to retrieve data from the manialink we're using
 			CGamePlaygroundUIConfig@ clientUI;
 			CGameManiaAppPlayground@ UIMgr;
-			CGameUILayer@ UI_Data_Layer = null;
-
 			
 			// Get references to all the variables we'll need and ensure we don't get any null pointer access errors
 			@app = GetApp();
@@ -476,10 +469,15 @@ namespace PlayerState
 			if(clientUI is null)
 				return;
 			
-			@UI_Data_Layer = this.GetLayer(Data_ML, "AR_Data", UIMgr, clientUI);
-			auto ML_localpage = cast<CGameManialinkPage>(UI_Data_Layer.LocalPage);//We load Manialink page to function like "GetFirstChild"
-			if(ML_localpage is null)
+			if(previous !is null && previous.UI_Data_Layer !is null) // Copy this because we will need it again
+				@UI_Data_Layer = previous.UI_Data_Layer;
+			
+			if(UI_Data_Layer is null || UI_Data_Layer.LocalPage is null)
+				@UI_Data_Layer = this.GetLayer(Data_ML, "AR_Data", UIMgr, clientUI);
+			if(UI_Data_Layer is null)
 				return;
+				
+			auto ML_localpage = cast<CGameManialinkPage>(UI_Data_Layer.LocalPage);//We load Manialink page to function like "GetFirstChild"
 			
 			auto LocalPlayer_Label = cast<CGameManialinkLabel>(ML_localpage.GetFirstChild("LocalPlayer"));
 			auto AllPlayers_Label = cast<CGameManialinkLabel>(ML_localpage.GetFirstChild("AllPlayers"));
