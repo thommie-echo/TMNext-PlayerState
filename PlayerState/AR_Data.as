@@ -171,10 +171,18 @@ namespace PlayerState
 		// Returns the layer in the player's UI or creates it if there is none (i.e. after leaving the menu), returns null if the LocalPage of the UILayer is null
 		CGameUILayer@ GetLayer(wstring manialink, const string &in id, CGameManiaAppPlayground@ UIMgr, CGamePlaygroundUIConfig@ clientUI)
 		{
+			for(uint i = 0; i < UIMgr.UILayers.Length; ++i) //This is used to check if we haven't already a layer with the same id, to avoid doubles
+			{
+				auto layer = cast<CGameUILayer>(UIMgr.UILayers[i]);
+				if(layer.LocalPage is null)
+					print("The UI Layer does not have a valid LocalPage");
+				else if(layer.AttachId == id)
+					return layer;
+			}
+			
 			auto injected_layer = UIMgr.UILayerCreate(); //This create a ML Layer in client UI
 			injected_layer.AttachId = id; //We'll use AttachId as a reference to get organized in which UI is what
 			injected_layer.ManialinkPage = manialink; //This is where the manialink code is
-			clientUI.UILayers.Add(injected_layer); // We add the UI Layer to player's UI
 			
 			return injected_layer;// The function return the layer pointer to easily modify stuff in it
 		}
@@ -469,8 +477,13 @@ namespace PlayerState
 			if(clientUI is null)
 				return;
 			
-			if(previous !is null && previous.UI_Data_Layer !is null) // Copy this because we will need it again
+			if(previous !is null && previous.UI_Data_Layer !is null && previous.UI_Data_Layer.LocalPage !is null) // Copy this because we will need it again
 				@UI_Data_Layer = previous.UI_Data_Layer;
+				
+			auto loadMgr = app.LoadProgress;
+			
+			if(loadMgr.State == NGameLoadProgress_SMgr::EState::Displayed)
+				return;
 			
 			if(UI_Data_Layer is null || UI_Data_Layer.LocalPage is null)
 				@UI_Data_Layer = this.GetLayer(Data_ML, "AR_Data", UIMgr, clientUI);
