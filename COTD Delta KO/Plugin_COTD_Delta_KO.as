@@ -1,7 +1,3 @@
-#name "COTD Delta KO"
-#author "AR_Thommie"
-#category "Aurora" // 331 340
-
 [Setting name="Disable above playercount"]
 int maxPlayerCount = 64;
 
@@ -132,7 +128,7 @@ void GetUILayer()
 	if(clientUI is null)
 		return;
 		
-	@UI_Data_Layer = GetLayer(ML, "COTD_Data", UIMgr, clientUI);
+	@UI_Data_Layer = GetLayer(ML, "COTD_Data", UIMgr);
 	
 	auto ML_localpage = cast<CGameManialinkPage>(UI_Data_Layer.LocalPage); //We load Manialink page to function like "GetFirstChild"
 	if(ML_localpage is null)
@@ -142,24 +138,24 @@ void GetUILayer()
 	@lbl_KOs = cast<CGameManialinkLabel>(ML_localpage.GetFirstChild("KOcount"));	
 }
 
-// Returns the layer in the player's UI or creates it if there is none (i.e. after leaving the menu)
-CGameUILayer@ GetLayer(wstring manialink, const string &in id, CGameManiaAppPlayground@ UIMgr, CGamePlaygroundUIConfig@ clientUI)
-{
-	for(uint i = 0; i < clientUI.UILayers.Length; ++i) //This is used to check if we haven't already a layer with the same id, to avoid doubles
+// Returns the layer in the player's UI or creates it if there is none (i.e. after leaving the menu), returns null if the LocalPage of the UILayer is null
+	CGameUILayer@ GetLayer(wstring manialink, const string &in id, CGameManiaAppPlayground@ UIMgr)
 	{
-		auto layer = cast<CGameUILayer>(clientUI.UILayers[i]);
-		if(layer.AttachId == id)
-			return layer;
+		for(uint i = 0; i < UIMgr.UILayers.Length; ++i) //This is used to check if we haven't already a layer with the same id, to avoid doubles
+		{
+			auto layer = cast<CGameUILayer>(UIMgr.UILayers[i]);
+			if(layer.LocalPage is null)
+				print("The UI Layer does not have a valid LocalPage");
+			else if(layer.AttachId == id)
+				return layer;
+		}
+		
+		auto injected_layer = UIMgr.UILayerCreate(); //This create a ML Layer in client UI
+		injected_layer.AttachId = id; //We'll use AttachId as a reference to get organized in which UI is what
+		injected_layer.ManialinkPage = manialink; //This is where the manialink code is
+		
+		return injected_layer;// The function return the layer pointer to easily modify stuff in it
 	}
-
-
-	auto injected_layer = UIMgr.UILayerCreate(); //This create a ML Layer in client UI
-	injected_layer.AttachId = id; //We'll use AttachId as a reference to get organized in which UI is what
-	injected_layer.ManialinkPage = manialink; //This is where the manialink code is
-	clientUI.UILayers.Add(injected_layer); // We add the UI Layer to player's UI
-
-	return injected_layer;// The function return the layer pointer to easily modify stuff in it
-}
 
 
 // Tries to find the CustomPlayerData for the provided login
@@ -440,7 +436,7 @@ void EndOfRoundReset()
 }
 
 
-void Render()
+void Update(float dt)
 {
 	PlayerState::sTMData@ previous = TMData;
 	@TMData = PlayerState::GetRaceData();
