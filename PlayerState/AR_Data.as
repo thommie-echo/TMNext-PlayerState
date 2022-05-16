@@ -227,21 +227,21 @@ namespace PlayerState
 				dPlayerInfo.NumberOfCheckpointsPassed = previous.dPlayerInfo.NumberOfCheckpointsPassed + 1; // Increment the number of cps passed
 				dPlayerInfo.RaceWaypointTimes = previous.dPlayerInfo.RaceWaypointTimes;
 				uint CPTime = AddCheckpointTime(false); // Add checkpoint time, but not a finish time
-				dPlayerInfo.LatestCPTime =CPTime;
+				dPlayerInfo.LatestCPTime = CPTime;
 			}
 			else if(dPlayerInfo.LatestCheckpointLandmarkIndex != dMapInfo.StartCPNumber) // Else copy from previous state
 			{
 				dPlayerInfo.NumberOfCheckpointsPassed = previous.dPlayerInfo.NumberOfCheckpointsPassed;
 				dPlayerInfo.RaceWaypointTimes = previous.dPlayerInfo.RaceWaypointTimes;
-				dMLData.NumCPs = previous.dMLData.NumCPs;
-				
 			}
 			
+			
 			dPlayerInfo.CurrentLapNumber = previous.dPlayerInfo.CurrentLapNumber;
+			dPlayerInfo.NumberOfCheckpointsPassed = dMLData.NumCPs - dMapInfo.NumberOfCheckpoints * dPlayerInfo.CurrentLapNumber;
 			dPlayerInfo.LapStartTime = previous.dPlayerInfo.LapStartTime;
 			
 			// If we're counting down but were driving previously, meaning we either finished or ended our run prematurely
-			if(PlayerState == EPlayerState::EPlayerState_Countdown && previous.PlayerState == EPlayerState::EPlayerState_Driving && dPlayerInfo.LatestCheckpointLandmarkIndex == dMapInfo.StartCPNumber)
+			if(PlayerState == EPlayerState::EPlayerState_Countdown && previous.PlayerState == EPlayerState::EPlayerState_Driving)// && dPlayerInfo.LatestCheckpointLandmarkIndex == dMapInfo.StartCPNumber)
 			{
 				dPlayerInfo.CurrentRaceTime = previous.dPlayerInfo.CurrentRaceTime; // Take the previous CurrentRaceTime because we're actually already counting down
 				PlayerState = EPlayerState::EPlayerState_EndRace; // Manually adjust to end race to get the event later in this function
@@ -659,7 +659,9 @@ namespace PlayerState
 					if(CurrentPlayground.Arena.MapLandmarks[i].Waypoint !is null)
 					{					
 						if(CurrentPlayground.Arena.MapLandmarks[i].Waypoint.IsMultiLap)
+						{
 							bIsMultiLap = true;
+						}
 					}
 					 
 					if(CurrentPlayground.Arena.MapLandmarks[i].Tag == "Checkpoint")
@@ -700,7 +702,7 @@ namespace PlayerState
 		int EndTime; // End time of the current run, see also IsFinish to see whether the time is a result of a finish or a reset
 		uint[] RaceWaypointTimes; // Also available in string format from sMLData
 		uint[] LapWaypointTimes; // TODO: find a way to implement this
-		uint NumberOfCheckpointsPassed; // This is actually the same as the length of RaceWaypointTimes but whatever...
+		uint NumberOfCheckpointsPassed; 
 		uint CurrentLapNumber; // CSmPlayer.ScriptAPI TODO: check if this works
 		int CurrentRaceTime; // CSmPlayer.ScriptAPI <-- doesn't work online so we calculate based on GameTime - StartTime
 		int LapStartTime; // CSmPlayer.ScriptAPI TODO: check if this works
