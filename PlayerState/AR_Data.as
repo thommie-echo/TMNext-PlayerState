@@ -219,25 +219,22 @@ namespace PlayerState
 			{
 				dMapInfo.bIsMultiLap = previous.dMapInfo.bIsMultiLap;
 			}
+			else
+			{
+				// Consider resetting values here if map is set to ""
+			}
 				
 			// We've passed more cps than previously and we're driving (to eliminate the weird time when joining a server where it changes NumCPs to 1 and you're not yet driving)
 			if(dMLData.NumCPs > previous.dMLData.NumCPs && dMLData.NumCPs > 0 && PlayerState == EPlayerState::EPlayerState_Driving) 
 			{
 				dEventInfo.CheckpointChange = true; // Set the event
-				dPlayerInfo.NumberOfCheckpointsPassed = previous.dPlayerInfo.NumberOfCheckpointsPassed + 1; // Increment the number of cps passed
-				dPlayerInfo.RaceWaypointTimes = previous.dPlayerInfo.RaceWaypointTimes;
 				uint CPTime = AddCheckpointTime(false); // Add checkpoint time, but not a finish time
 				dPlayerInfo.LatestCPTime = CPTime;
 			}
-			else if(dPlayerInfo.LatestCheckpointLandmarkIndex != dMapInfo.StartCPNumber) // Else copy from previous state
-			{
-				dPlayerInfo.NumberOfCheckpointsPassed = previous.dPlayerInfo.NumberOfCheckpointsPassed;
-				dPlayerInfo.RaceWaypointTimes = previous.dPlayerInfo.RaceWaypointTimes;
-			}
 			
-			
+			dPlayerInfo.RaceWaypointTimes = previous.dPlayerInfo.RaceWaypointTimes;
 			dPlayerInfo.CurrentLapNumber = previous.dPlayerInfo.CurrentLapNumber;
-			dPlayerInfo.NumberOfCheckpointsPassed = dMLData.NumCPs - dMapInfo.NumberOfCheckpoints * dPlayerInfo.CurrentLapNumber;
+			dPlayerInfo.NumberOfCheckpointsPassed = dMLData.NumCPs - (dMapInfo.NumberOfCheckpoints + 1) * dPlayerInfo.CurrentLapNumber;
 			dPlayerInfo.LapStartTime = previous.dPlayerInfo.LapStartTime;
 			
 			// If we're counting down but were driving previously, meaning we either finished or ended our run prematurely
@@ -324,11 +321,12 @@ namespace PlayerState
 		
 		void StartRun()
 		{
+			dPlayerInfo.NumberOfCheckpointsPassed = 0;
+			dPlayerInfo.CurrentLapNumber = 0;
+			dPlayerInfo.LapStartTime = 0;
 			if(dMapInfo.bIsMultiLap)
 			{
 				dEventInfo.LapChange = true;
-				dPlayerInfo.CurrentLapNumber = 0;
-				dPlayerInfo.LapStartTime = 0;
 			}
 		}
 		
@@ -606,6 +604,7 @@ namespace PlayerState
 		
 		int NumberOfCheckpoints; // CurrentPlayground.Arena.MapLandmarks.Tag = "Checkpoint", "Goal" = Finish, "Spawn"=  Start
 		int StartCPNumber;
+		int MultiLapCPNumber = -1;
 		
 		bool bIsMultiLap;
 		
@@ -660,14 +659,18 @@ namespace PlayerState
 					{					
 						if(CurrentPlayground.Arena.MapLandmarks[i].Waypoint.IsMultiLap)
 						{
+						print(CurrentPlayground.Arena.MapLandmarks[i].Tag);
 							bIsMultiLap = true;
 						}
 					}
+					
 					 
-					if(CurrentPlayground.Arena.MapLandmarks[i].Tag == "Checkpoint")
+					if(CurrentPlayground.Arena.MapLandmarks[i].Tag == "Checkpoint" || CurrentPlayground.Arena.MapLandmarks[i].Tag == "LinkedCheckpoint")
 						NumberOfCheckpoints++;
 					else if(CurrentPlayground.Arena.MapLandmarks[i].Tag == "Spawn")
 						StartCPNumber = i;
+					else if(CurrentPlayground.Arena.MapLandmarks[i].Tag == "StartFinish")
+						MultiLapCPNumber = i;
 				}
 			}
 		}
