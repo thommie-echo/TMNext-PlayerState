@@ -31,7 +31,7 @@ int KOCount; // Number of KOs this round, 0 if warm-up or first round
 int numPlayers; // Number of players in the round
 
 string NumberFont = "DroidSans.ttf";
-Resources::Font@ m_font;
+nvg::Font m_font;
 
 CGameManialinkLabel@ lbl_Players; // The label containing the number of players
 CGameManialinkLabel@ lbl_KOs; // The label containing the KO count
@@ -74,7 +74,7 @@ class CPInfo
 
 void Main() 
 {
-	@m_font = Resources::GetFont(NumberFont);
+	m_font = nvg::LoadFont(NumberFont);
 	
 	OnlinePlayers.Reserve(64);	
 	GetUILayer();
