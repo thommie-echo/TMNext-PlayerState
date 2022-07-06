@@ -650,7 +650,7 @@ namespace PlayerState
 		{
 			uint numLandmarks = CurrentPlayground.Arena.MapLandmarks.get_Length();
 			MapLandmarks = CurrentPlayground.Arena.MapLandmarks;
-            array<int> links = {};
+			array<int> links = {};
 
 			for(uint i = 0; i < numLandmarks; i++)
 			{
@@ -668,14 +668,14 @@ namespace PlayerState
 
 					if(CurrentPlayground.Arena.MapLandmarks[i].Tag == "Checkpoint")
 						NumberOfCheckpoints++;
-                    else if(CurrentPlayground.Arena.MapLandmarks[i].Tag == "LinkedCheckpoint")
-                    {
-                        if(links.Find(CurrentPlayground.Arena.MapLandmarks[i].Order) < 0)
-                        {
+					else if(CurrentPlayground.Arena.MapLandmarks[i].Tag == "LinkedCheckpoint")
+					{
+						if(links.Find(CurrentPlayground.Arena.MapLandmarks[i].Order) < 0)
+						{
 							NumberOfCheckpoints++;
 							links.InsertLast(CurrentPlayground.Arena.MapLandmarks[i].Order);
 						}
-                    }
+					}
 					else if(CurrentPlayground.Arena.MapLandmarks[i].Tag == "Spawn")
 						StartCPNumber = i;
 					else if(CurrentPlayground.Arena.MapLandmarks[i].Tag == "StartFinish")
