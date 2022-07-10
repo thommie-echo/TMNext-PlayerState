@@ -49,7 +49,7 @@ void Update(float dt)
 				if(TMData.dEventInfo.bRespawned)
 					print("Player respawned at time: " + TMData.dPlayerInfo.RespawnTime);
 				else
-					print("Player regained control after respawn");
+					print("Player regained control after respawn at: " + TMData.dPlayerInfo.CurrentRaceTime);
 			}
 				
 		}
@@ -318,6 +318,12 @@ void Render()
 		UI::Text("NbRespawnsRequested");
 		UI::TableNextColumn();
 		UI::Text("" + TMData.dPlayerInfo.NbRespawnsRequested);
+		
+		UI::TableNextColumn();
+		UI::Text("RespawnType");
+		UI::TableNextColumn();
+		UI::Text("" + tostring(TMData.dPlayerInfo.RespawnType));
+		
 		UI::EndTable();
 	}
 }
