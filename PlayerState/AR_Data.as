@@ -289,18 +289,37 @@ namespace PlayerState
 			
 			dEventInfo.bRespawned = previous.dEventInfo.bRespawned;
 			dEventInfo.bRespawnChange = false;
+			dPlayerInfo.RespawnTime = previous.dPlayerInfo.RespawnTime;
 			if(PlayerState == EPlayerState::EPlayerState_Driving)
 			{
-				if(dEventInfo.bRespawned && dPlayerInfo.Speed != previous.dPlayerInfo.Speed)
+				if(dEventInfo.bRespawned) // Recently respawned
+				{
+					if(dPlayerInfo.CurrentRaceTime - dPlayerInfo.RespawnTime > 1000 && dPlayerInfo.RespawnTime > 0) // no longer in respawn
+					{
+						dEventInfo.bRespawned = false;
+						dEventInfo.bRespawnChange = true;
+						dPlayerInfo.RespawnTime = 0;
+					}
+					else if(dPlayerInfo.Speed == 0 || dPlayerInfo.Speed == previous.dPlayerInfo.Speed) // still in respawn
+					{
+					}
+					else
+					{
+					}
+				}
+				if(dEventInfo.bRespawned && dPlayerInfo.Speed != previous.dPlayerInfo.Speed && dPlayerInfo.CurrentRaceTime - previous.dPlayerInfo.RespawnTime < 900)
 				{
 					dEventInfo.bRespawned = false;
 					dEventInfo.bRespawnChange = true;
+					dPlayerInfo.RespawnTime = 0;
 				}
 				if(dPlayerInfo.NbRespawnsRequested > previous.dPlayerInfo.NbRespawnsRequested)
 				{
+					if(!dEventInfo.bRespawned)
+						dPlayerInfo.RespawnTime = dPlayerInfo.CurrentRaceTime;
 					dEventInfo.bRespawned = true;
 					dEventInfo.bRespawnChange = true;
-					dPlayerInfo.RespawnTime = dPlayerInfo.CurrentRaceTime;
+					
 				}	
 			}
 				

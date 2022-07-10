@@ -49,7 +49,7 @@ void Update(float dt)
 				if(TMData.dEventInfo.bRespawned)
 					print("Player respawned at time: " + TMData.dPlayerInfo.RespawnTime);
 				else
-					print("Player regained control after respawn");
+					print("Player regained control after respawn at: " + TMData.dPlayerInfo.CurrentRaceTime);
 			}
 				
 		}
