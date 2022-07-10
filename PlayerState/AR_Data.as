@@ -31,9 +31,13 @@ namespace PlayerState
 		EPlayerState_Spectating, // [IsSpectator]
 		EPlayerState_InEditor, // [app.Editor] !is null
 	}
-
-
-
+	
+	shared enum ERespawnType
+	{
+		ERespawnType_None = 0,
+		ERespawnType_Running,
+		ERespawnType_Standing,
+	}
 
 	shared class sEventInfo
 	{
@@ -274,7 +278,7 @@ namespace PlayerState
 				}
 			}
 
-
+			// Handle playerstate change events
 			if(PlayerState != previous.PlayerState)
 			{
 				dEventInfo.PlayerStateChange = true;
@@ -287,40 +291,50 @@ namespace PlayerState
 					StartRun();
 			}
 
+			// Handle respawn events
 			dEventInfo.bRespawned = previous.dEventInfo.bRespawned;
 			dEventInfo.bRespawnChange = false;
 			dPlayerInfo.RespawnTime = previous.dPlayerInfo.RespawnTime;
+			dPlayerInfo.RespawnType = previous.dPlayerInfo.RespawnType;
 			if(PlayerState == EPlayerState::EPlayerState_Driving)
 			{
-				if(dEventInfo.bRespawned) // Recently respawned
+				if(dPlayerInfo.NbRespawnsRequested > previous.dPlayerInfo.NbRespawnsRequested) // We've just respawned
 				{
-					if(dPlayerInfo.CurrentRaceTime - dPlayerInfo.RespawnTime > 1000 && dPlayerInfo.RespawnTime > 0) // no longer in respawn
+					if(dPlayerInfo.RespawnType == ERespawnType_None) // initial respawn, so running
 					{
+						dPlayerInfo.RespawnType = ERespawnType_Running;
+						dPlayerInfo.RespawnTime = dPlayerInfo.CurrentRaceTime;
+						dEventInfo.bRespawned = true;
+						dEventInfo.bRespawnChange = true;
+					}
+					else if(dPlayerInfo.RespawnType == ERespawnType_Running) // secondary respawn, means we're standing now
+					{
+						dPlayerInfo.RespawnType = ERespawnType_Standing;
+						dPlayerInfo.RespawnTime = dPlayerInfo.CurrentRaceTime;
+						dEventInfo.bRespawned = true;
+						dEventInfo.bRespawnChange = true;
+					}
+					else if(dPlayerInfo.RespawnType == ERespawnType_Standing) // we're already standing so we'll just ignore this
+					{
+					}
+				}
+				else if(dPlayerInfo.RespawnTime != 0) // We're still respawning
+				{
+					if(dPlayerInfo.Speed != previous.dPlayerInfo.Speed && !previous.dEventInfo.bRespawnChange) // This should mean our respawn ended right?
+					{
+						dPlayerInfo.RespawnType = ERespawnType_None;
+						dPlayerInfo.RespawnTime = 0;
 						dEventInfo.bRespawned = false;
 						dEventInfo.bRespawnChange = true;
-						dPlayerInfo.RespawnTime = 0;
-					}
-					else if(dPlayerInfo.Speed == 0 || dPlayerInfo.Speed == previous.dPlayerInfo.Speed) // still in respawn
-					{
-					}
-					else
-					{
 					}
 				}
-				if(dEventInfo.bRespawned && dPlayerInfo.Speed != previous.dPlayerInfo.Speed && dPlayerInfo.CurrentRaceTime - previous.dPlayerInfo.RespawnTime < 900)
-				{
-					dEventInfo.bRespawned = false;
-					dEventInfo.bRespawnChange = true;
-					dPlayerInfo.RespawnTime = 0;
-				}
-				if(dPlayerInfo.NbRespawnsRequested > previous.dPlayerInfo.NbRespawnsRequested)
-				{
-					if(!dEventInfo.bRespawned)
-						dPlayerInfo.RespawnTime = dPlayerInfo.CurrentRaceTime;
-					dEventInfo.bRespawned = true;
-					dEventInfo.bRespawnChange = true;
-					dPlayerInfo.RespawnTime = dPlayerInfo.CurrentRaceTime;
-				}
+			}
+			else // We're not driving so we can't possibly have respawned
+			{
+				dEventInfo.bRespawned = false;
+				dEventInfo.bRespawnChange = false;
+				dPlayerInfo.RespawnTime = 0;
+				dPlayerInfo.RespawnType = ERespawnType_None;
 			}
 
 
@@ -738,6 +752,7 @@ namespace PlayerState
 		int CurrentRaceTime; // CSmPlayer.ScriptAPI <-- doesn't work online so we calculate based on GameTime - StartTime
 		int LapStartTime; // CSmPlayer.ScriptAPI TODO: check if this works
 		uint LatestCPTime;
+		ERespawnType RespawnType; // Updates when the player respawns to either standing or running
 
 		// Values determined by TM (online)
 		int StartTime; // CSmPlayer.ScriptAPI; in GameTime

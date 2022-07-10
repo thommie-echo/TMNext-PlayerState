@@ -318,6 +318,12 @@ void Render()
 		UI::Text("NbRespawnsRequested");
 		UI::TableNextColumn();
 		UI::Text("" + TMData.dPlayerInfo.NbRespawnsRequested);
+		
+		UI::TableNextColumn();
+		UI::Text("RespawnType");
+		UI::TableNextColumn();
+		UI::Text("" + tostring(TMData.dPlayerInfo.RespawnType));
+		
 		UI::EndTable();
 	}
 }
