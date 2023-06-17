@@ -425,7 +425,7 @@ namespace PlayerState
 			}
 		}
 
-		void Update(sTMData@ previous) // TODO: use previous to determine when to update things that don't need to update very tick, e.g. mapinfo, serverinfo
+		void Update(sTMData@ previous, const MLFeed::PlayerCpInfo_V3@ plf) // TODO: use previous to determine when to update things that don't need to update very tick, e.g. mapinfo, serverinfo
 		{
 			// CGamePlaygroundScript@ PlaygroundScript; // app.PlaygroundScript; // Null if online
 			// CGameCtnChallengeInfo@ MapInfo; // RootMap.MapInfo; // null pointer access while loading map
@@ -498,50 +498,11 @@ namespace PlayerState
 
 			if(PlayerState == EPlayerState::EPlayerState_Menus)
 				return;
-
-			// All this is needed to get the UI labels to retrieve the values we set in the manialink
-			@UIMgr = cast<CGameManiaAppPlayground>(Network.ClientManiaAppPlayground); //This is ClientSide ManiaApp
-			if(UIMgr is null)
-				return;
-
-			@clientUI = cast<CGamePlaygroundUIConfig>(UIMgr.ClientUI); //We access ClientSide UI class
-			if(clientUI is null)
-				return;
-
-			if(previous !is null && previous.UI_Data_Layer !is null && previous.UI_Data_Layer.LocalPage !is null) // Copy this because we will need it again
-				@UI_Data_Layer = previous.UI_Data_Layer;
-
-			auto loadMgr = app.LoadProgress;
-
-			if(loadMgr.State == NGameLoadProgress_SMgr::EState::Displayed)
-				return;
-
-			if(UI_Data_Layer is null || UI_Data_Layer.LocalPage is null)
-				@UI_Data_Layer = this.GetLayer(Data_ML, "AR_Data", UIMgr, clientUI);
-			if(UI_Data_Layer is null)
-				return;
-
-			auto ML_localpage = cast<CGameManialinkPage>(UI_Data_Layer.LocalPage);//We load Manialink page to function like "GetFirstChild"
-
-			auto LocalPlayer_Label = cast<CGameManialinkLabel>(ML_localpage.GetFirstChild("LocalPlayer"));
-			auto AllPlayers_Label = cast<CGameManialinkLabel>(ML_localpage.GetFirstChild("AllPlayers"));
-			auto NumCPs_Label = cast<CGameManialinkLabel>(ML_localpage.GetFirstChild("NumCPs"));
-			auto PlayerLastCheckpointTime_Label = cast<CGameManialinkLabel>(ML_localpage.GetFirstChild("PlayerLastCheckpointTime"));
-
-			if(LocalPlayer_Label is null || AllPlayers_Label is null || NumCPs_Label is null || PlayerLastCheckpointTime_Label is null)
-				return;
-
-			dMLData.PlayerData = LocalPlayer_Label.Value;
-
-			string[] split = dMLData.PlayerData.Split(",@,");
-			if(split.Length > 3)
-			{
-				dMLData.StartTime = Text::ParseInt(split[1]);
-				dMLData.CurrentRaceTime = Text::ParseInt(split[2]);
-			}
-			dMLData.AllPlayerData = AllPlayers_Label.Value;
-			dMLData.NumCPs = Text::ParseInt(NumCPs_Label.Value);
-			dMLData.PlayerLastCheckpointTime = Text::ParseInt(PlayerLastCheckpointTime_Label.Value);
+				
+			dMLData.NumCPs = plf.cpCount;
+			dMLData.PlayerLastCheckpointTime = plf.lastCpTime;
+			dMLData.StartTime = plf.StartTime;
+			dMLData.CurrentRaceTime = plf.CurrentRaceTime;
 		}
 	}
 

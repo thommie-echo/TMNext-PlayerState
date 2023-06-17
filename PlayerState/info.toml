@@ -3,8 +3,9 @@ name = "PlayerState"
 author = "Thommie"
 category = "Race"
 siteid = 191
-version = "1.2.0"
+version = "1.3.0"
 
 [script]
+dependencies = [ "MLHook", "MLFeedRaceData" ]
 exports = [ "Exports.as" ]
 shared_exports = [ "AR_Data.as" ]

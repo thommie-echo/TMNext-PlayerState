@@ -6,9 +6,39 @@ bool RenderDebug = false;
 
 PlayerState::sTMData@ TMData;
 
+// Shameless copy from CotdBufferTime
 void Main() {
-	@TMData = PlayerState::sTMData();
-	TMData.Update(null);
+    bool depMLHook = false;
+    bool depMLFeed = false;
+#if DEPENDENCY_MLHOOK
+    depMLHook = true;
+#endif
+#if DEPENDENCY_MLFEEDRACEDATA
+    depMLFeed = true;
+#endif
+    if (depMLFeed && depMLHook) {
+        @TMData = PlayerState::sTMData();
+		PlayerState::sTMData@ previous = PlayerState::sTMData();
+		previous.InitialData();
+		const MLFeed::HookRaceStatsEventsBase_V3@ mlf = MLFeed::GetRaceData_V3();
+		const MLFeed::PlayerCpInfo_V3@ plf = mlf.GetPlayer_V3(MLFeed::LocalPlayersName);
+		TMData.Update(previous, plf);
+    } else {
+        sleep(3000); // plugin manager will reload improperly if updates happen simultaneously
+        if (!depMLHook) {
+            NotifyDepError("Requires MLHook");
+        } else if (!depMLFeed) {
+            NotifyDepError("Requires MLFeed: Race Data");
+        } else {
+            NotifyDepError("Unknown dependency error.");
+        }
+    }
+}
+
+// Shameless copy from CotdBufferTime
+void NotifyDepError(const string &in msg) {
+    warn(msg);
+    UI::ShowNotification(Meta::ExecutingPlugin().Name + ": Dependency Error", msg + "\n\nNote: if you see this while updating multiple plugins, you can probably ignore it.", vec4(.9, .6, .1, .5), 15000);
 }
 
 
@@ -19,8 +49,11 @@ void Update(float dt)
 	{
 		PlayerState::sTMData@ previous = TMData;
 		
+		const MLFeed::HookRaceStatsEventsBase_V3@ mlf = MLFeed::GetRaceData_V3();
+		const MLFeed::PlayerCpInfo_V3@ plf = mlf.GetPlayer_V3(MLFeed::LocalPlayersName);
+		
 		@TMData = PlayerState::sTMData();
-		TMData.Update(previous);
+		TMData.Update(previous, plf);
 		TMData.Compare(previous);
 
 		
