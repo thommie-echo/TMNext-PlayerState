@@ -484,7 +484,7 @@ namespace PlayerState
 			dMapInfo.Update(RootMap, CurrentPlayground, previous);
 
 			// We need these to find the local player
-			if(CurrentPlayground.GameTerminals.get_Length() < 1 || CurrentPlayground.GameTerminals[0].ControlledPlayer is null)
+			if(CurrentPlayground.GameTerminals.Length < 1 || CurrentPlayground.GameTerminals[0].ControlledPlayer is null)
 				return;
 
 			@Player = cast<CSmPlayer>(CurrentPlayground.GameTerminals[0].ControlledPlayer);
@@ -579,7 +579,7 @@ namespace PlayerState
 
 			CurGameModeStr = ServerInfo.CurGameModeStr; // You could use this to determine whether it's online or offline or rounds or time-attack or custom
 
-			PlayerCount = CurrentPlayground.Players.get_Length();
+			PlayerCount = CurrentPlayground.Players.Length;
 
 			if(PlayerCount == 0)
 				return;
@@ -664,12 +664,12 @@ namespace PlayerState
 			TMObjective_SilverTime = RootMap.TMObjective_SilverTime;
 			TMObjective_BronzeTime = RootMap.TMObjective_BronzeTime;
 
-			if(CurrentPlayground is null || CurrentPlayground.Arena is null || CurrentPlayground.Arena.MapLandmarks.get_Length() < 1)
+			if(CurrentPlayground is null || CurrentPlayground.Arena is null || CurrentPlayground.Arena.MapLandmarks.Length < 1)
 				return;
 
 			if(previous is null)
 				UpdateLandmarks(CurrentPlayground);
-			else if(previous.dMapInfo.EdChallengeId == EdChallengeId && previous.dMapInfo.MapLandmarks.get_Length() > 0)
+			else if(previous.dMapInfo.EdChallengeId == EdChallengeId && previous.dMapInfo.MapLandmarks.Length > 0)
 			{
 				MapLandmarks = previous.dMapInfo.MapLandmarks;
 				NumberOfCheckpoints = previous.dMapInfo.NumberOfCheckpoints;
@@ -681,7 +681,7 @@ namespace PlayerState
 
 		void UpdateLandmarks(CSmArenaClient@ CurrentPlayground)
 		{
-			uint numLandmarks = CurrentPlayground.Arena.MapLandmarks.get_Length();
+			uint numLandmarks = CurrentPlayground.Arena.MapLandmarks.Length;
 			MapLandmarks = CurrentPlayground.Arena.MapLandmarks;
 			array<int> links = {};
 
@@ -719,7 +719,7 @@ namespace PlayerState
 
 		bool IsMultiLap(int Index)
 		{
-			if(MapLandmarks.get_Length() < 1)
+			if(MapLandmarks.Length < 1)
 				return false;
 
 			if(MapLandmarks[Index].Waypoint is null) // Null if start
@@ -730,7 +730,7 @@ namespace PlayerState
 
 		bool IsFinish(int Index)
 		{
-			if(MapLandmarks.get_Length() < 1)
+			if(MapLandmarks.Length < 1)
 				return false;
 
 			if(MapLandmarks[Index].Waypoint is null) // Null if start
